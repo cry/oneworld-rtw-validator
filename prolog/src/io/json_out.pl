@@ -15,6 +15,7 @@
 :- use_module('../../data/limits').
 :- use_module('../../data/cities').
 :- use_module('../../data/surcharges').
+:- use_module('../../data/booking_codes').
 :- use_module('../geo').
 :- use_module('../annotate').
 :- use_module('../itinerary').
@@ -218,6 +219,7 @@ ruleset_json(_{ version: Version,
                 stopKinds: StopKinds,
                 modes: Modes,
                 routeSyntax: RouteHelp,
+                bookingCodes: BookingCodes,
                 surchargeBands: Bands }) :-
     ruleset_version(Version),
     all_limits(Pairs),
@@ -240,8 +242,74 @@ ruleset_json(_{ version: Version,
     findall(K, stop_kind(K), StopKinds),
     findall(M, itinerary_mode(M), Modes),
     route_help(RouteHelp),
+    booking_codes_json(BookingCodes),
     surcharge_bands(Bands0),
     maplist([band(Desc, Usd), _{ sectors: Desc, usd: Usd }]>>true, Bands0, Bands).
+
+%! booking_codes_json(-Dict) is det.
+%  Section 5(b), as a table. It is here for the same reason the limits and the
+%  routing grammar are: so a client never has to hardcode rule data. Until now
+%  this was the last piece that had no way out of the program, which made "which
+%  code does this fare book into" a question only the validator could answer, and
+%  only about an itinerary somebody had already written.
+%
+%  The notes come out as their own lists rather than folded into the rows,
+%  because each one carries a condition the rows do not: a lower-class code is
+%  open only where the cabin is not offered, and A on QR only within the Middle
+%  East. Which of them applies to a given sector is a reading of the rule, and
+%  that reading stays in src/rules/r05_booking.pl. This publishes the table it
+%  reads, not its conclusions.
+booking_codes_json(_{ columns: Columns,
+                      cabinColumns: CabinColumns,
+                      rows: Rows,
+                      premiumEconomy: Pe,
+                      businessAlternate: BizAlt,
+                      firstAlternate: FirstAlt,
+                      middleEastBusiness: MidEast }) :-
+    findall(_{ key: Column, name: Name },
+            ( booking_column(Column), column_name(Column, Name) ),
+            Columns),
+    findall(Cabin-Cols,
+            ( member(Cabin, [first, business, economy]),
+              findall(C, cabin_column(Cabin, C), Cols) ),
+            CabinPairs),
+    foldl([K-V, In, Out]>>put_dict(K, In, V, Out), CabinPairs, _{}, CabinColumns),
+    findall(Row, booking_row_json(Row), Rows),
+    findall(_{ carrier: C, code: Code },
+            ( premium_economy_code(Carrier, Raw),
+              upcase_atom(Carrier, C), upcase_atom(Raw, Code) ),
+            Pe),
+    % Enumerated from the table rather than through carrier_has_codes/1, which
+    % cuts after its first solution and so cannot be backtracked into.
+    coded_carriers(Carriers),
+    findall(_{ carrier: C, code: Code },
+            ( member(Carrier, Carriers),
+              business_alternate_code(Carrier, Raw),
+              upcase_atom(Carrier, C), upcase_atom(Raw, Code) ),
+            BizAlt),
+    findall(Code, ( first_alternate_code(Raw), upcase_atom(Raw, Code) ), FirstAlt),
+    findall(_{ carrier: C, code: Code },
+            ( middle_east_business_code(Carrier, Raw),
+              upcase_atom(Carrier, C), upcase_atom(Raw, Code) ),
+            MidEast).
+
+%! coded_carriers(-Carriers) is det.
+%  Every carrier 5(b) publishes a row for, in code order.
+coded_carriers(Carriers) :-
+    setof(Carrier, Scope^Column^Code^booking_code(Carrier, Scope, Column, Code),
+          Carriers).
+
+% One row per carrier and scope, which is how 5(b) prints it. A carrier with no
+% separate domestic rows has a single `any` row.
+booking_row_json(Row) :-
+    setof(Carrier-Scope, Column^Code^booking_code(Carrier, Scope, Column, Code), Pairs),
+    member(Carrier-Scope, Pairs),
+    upcase_atom(Carrier, C),
+    findall(Column-Code,
+            ( booking_code(Carrier, Scope, Column, Raw), upcase_atom(Raw, Code) ),
+            Codes),
+    foldl([K-V, In, Out]>>put_dict(K, In, V, Out), Codes,
+          _{ carrier: C, scope: Scope }, Row).
 
 %! airport_json(+Iata, -Dict) is det.
 airport_json(A, _{ iata: Upper, city: City, country: Country, region: Region,

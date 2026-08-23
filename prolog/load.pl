@@ -67,6 +67,7 @@
 :- ensure_loaded('test/test_rules').
 :- ensure_loaded('test/test_route').
 :- ensure_loaded('test/test_json').
+:- ensure_loaded('test/test_mcp').
 :- ensure_loaded('test/earn/conformance').
 :- ensure_loaded('test/test_earn').
 :- endif.
