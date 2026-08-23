@@ -1,31 +1,31 @@
 # oneworld-rtw-planner
 
 A SWI-Prolog engine that answers one question: **is this round-the-world itinerary a valid oneworld
-Explorer fare?** When it isn't, the answer names every rule that was broken, and why. It validates
-and explains. It does not build or optimise itineraries.
+Explorer fare?** When it is not, the answer names every rule the itinerary breaks, and why. The
+engine validates and explains. It does not build or optimise itineraries.
 
-The ruleset is oneworld Explorer, Tariff RWR2 Rule 3015, version 27 FEB 26, transcribed in
-[`parsed-rules-aug-2026.md`](parsed-rules-aug-2026.md). Every violation cites the clause it came
-from, so you can check any answer against that text.
+The ruleset is oneworld Explorer, Tariff RWR2 Rule 3015, version 27 FEB 26.
+[`parsed-rules-aug-2026.md`](parsed-rules-aug-2026.md) holds the transcription. Every violation
+cites the clause it came from, so you can compare any answer with that text.
 
 There are three ways to run it: a CLI, an HTTP service, and a **static page that carries the
-validator with it**. The page runs the same Prolog compiled to WebAssembly, so the browser applies
-the rules itself instead of asking a server. It needs no server at all, and it is what gets
+validator with it**. The page runs the same Prolog, compiled to WebAssembly. The browser applies the
+rules itself instead of asking a server. The page needs no server at all, and it is the version
 published to GitHub Pages. See [In the browser](#in-the-browser).
 
-This file is how to use it. [`DESIGN.md`](DESIGN.md) is why it is built the way it is: the rule
-readings that are not obvious, the shape of the code, and what the test suite is really for.
+This file is how to use it. [`DESIGN.md`](DESIGN.md) is why it is built the way it is. It covers the
+rule readings that are not obvious, the shape of the code, and the real purpose of the test suite.
 
 ## Requirements
 
-SWI-Prolog 9 or later (`brew install swi-prolog`). No third-party packs are needed: the HTTP server,
-the CSV reader and plunit all ship with SWI. The airport table is committed, so a fresh clone runs
-offline.
+Install SWI-Prolog 9 or later (`brew install swi-prolog`). You need no third-party packs: the HTTP
+server, the CSV reader and plunit all ship with SWI. The airport table is committed, so a fresh clone
+runs offline.
 
-Node is needed only to rebuild the generated files — the stylesheet, the map bundle, the WebAssembly
-pair and the loyalty earning tables — and only if you edit them. All of them are committed. Running,
-testing and deploying the validator never touch npm, and neither does the page once it is built. See
-[Web UI](#web-ui).
+You need node only to rebuild the generated files, and only if you edit them. Those files are the
+stylesheet, the map bundle, the WebAssembly pair and the loyalty earning tables. All of them are
+committed. The validator never touches npm when you run it, test it or deploy it. The built page
+does not touch it either. See [Web UI](#web-ui).
 
 ## Use
 
@@ -49,7 +49,8 @@ swipl prolog/cli.pl -- route "NYC-BA-X/LON-QR-BKK//SIN-QF-SYD-QF-X/LAX-AA-NYC" -
 swipl prolog/cli.pl -- earn prolog/test/fixtures/lhr_classes.json
 ```
 
-A report names the verdict, then every rule broken with the clause it came from, then the fare basis:
+A report names three things in order: the verdict, then every rule broken with the clause it came
+from, then the fare basis.
 
 ```
 INVALID — 1 error
@@ -61,8 +62,8 @@ Exit codes: `0` valid, `1` invalid or indeterminate, `2` malformed input, `3` in
 
 ### Routings
 
-Most of the ruleset is about *where* the journey goes, not when. So you can give an itinerary the
-way a fare is actually written down, with no dates anywhere:
+Most of the ruleset is about *where* the journey goes, not when. Thus you can write an itinerary the
+way a fare is written down, with no dates anywhere:
 
 ```
 NYC-BA-X/LON-QR-BKK//SIN-QF-SYD-QF-X/LAX-AA-NYC
@@ -76,42 +77,44 @@ NYC-BA-X/LON-QR-BKK//SIN-QF-SYD-QF-X/LAX-AA-NYC
 | `A//B` | that leg is a 4(g) surface sector, at the passenger's own expense |
 | `BA` between two points | the carrier of the leg that follows |
 
-Length is what tells the token kinds apart: airline designators are two characters and place codes
-are three. So `XIY` is Xi'an rather than a transfer at `IY`, and nothing needs escaping. A handful of
-4(j) affiliates do have three-letter designators. Those count as carriers only when no airport or
-city answers to the same code. `HAC` is both Hokkaido Air System and Hachijojima, so a routing reads
-it as the airport. Writing a routing for an itinerary flown on HAC is refused rather than written
-down as a string that would parse back into a different journey.
+Length tells the token kinds apart: airline designators are two characters and place codes are
+three. Thus `XIY` is Xi'an rather than a transfer at `IY`, and nothing needs escaping.
 
-Metropolitan city codes (`NYC`, `LON`, `TYO`, …) are listed in
-[`prolog/data/cities.pl`](prolog/data/cities.pl) and served from `/api/ruleset`. The table runs both
-ways.
+A few 4(j) affiliates do have three-letter designators. Those count as carriers only when no airport
+or city answers to the same code. `HAC` is both Hokkaido Air System and Hachijojima, so a routing
+reads it as the airport. An itinerary flown on HAC gets no routing at all. The alternative is a
+string that parses back into a different journey.
 
-Forwards, a city code resolves to a representative airport, so `NYC-LON` and `JFK-LHR` are the same
-journey. Backwards, an airport knows which metropolitan area it belongs to. That is what 4(i) is
-actually written in ("the same city pairs / sectors cannot be flown more than once"), and what 4(c)
-and 4(d) mean by a point. So `LON-NYC` flown out of Heathrow and back into Gatwick is one city pair
-flown twice; a stop at Gatwick on a journey that began at Heathrow is travel via the origin; and
-finishing at Gatwick is finishing at home rather than leaving an origin-destination surface sector.
+[`prolog/data/cities.pl`](prolog/data/cities.pl) lists the metropolitan city codes (`NYC`, `LON`,
+`TYO`, …), and `/api/ruleset` serves the same table. The table runs both ways.
 
-Airports that IATA holds as their own city are left out of the table on purpose — Paris Beauvais,
-Westchester, Kitchener/Waterloo — because grouping places the fare rule keeps separate invents
+Forwards, a city code resolves to a representative airport. Thus `NYC-LON` and `JFK-LHR` are the same
+journey. Backwards, an airport knows which metropolitan area it belongs to. 4(i) is written in these
+city terms ("the same city pairs / sectors cannot be flown more than once"), and they are what 4(c)
+and 4(d) mean by a point. Three results follow:
+
+- `LON-NYC` flown out of Heathrow and back into Gatwick is one city pair flown twice.
+- A stop at Gatwick on a journey that began at Heathrow is travel via the origin.
+- A finish at Gatwick is a finish at home, not an origin-destination surface sector.
+
+The table leaves out the airports that IATA holds as their own city: Paris Beauvais, Westchester,
+Kitchener/Waterloo. This is deliberate. To group places that the fare rule keeps separate invents
 violations, and that is the more expensive way to be wrong.
 
-A 4(c) origin–destination gap is checked against the seven relations that clause permits and named
-in the report, but it is **not** counted toward 4(h)'s maximum of 16 segments — see
-[Reading the rule](DESIGN.md#reading-the-rule-where-it-is-ambiguous).
+The validator measures a 4(c) origin–destination gap against the seven relations that the clause
+permits, and names it in the report. The gap does **not** count toward the maximum of 16 segments in
+4(h). See [Reading the rule](DESIGN.md#reading-the-rule-where-it-is-ambiguous).
 
-You can give the same information per segment instead, as `"stop": "transfer" | "stopover"` on the
-segment that *arrives* at the point. `layover`, `connection` and `transit` are all accepted for
-`transfer`. A declaration beats the clock, because the traveller knows what was booked, but it does
-not beat a surface sector. Where the two disagree, the disagreement is reported as a warning rather
-than settled in silence.
+You can give the same information per segment instead. Put `"stop": "transfer" | "stopover"` on the
+segment that *arrives* at the point. `layover`, `connection` and `transit` all mean `transfer`. A
+declaration beats the clock, because the traveller knows what was booked. It does not beat a surface
+sector. Where the two disagree, the report gives a warning rather than a silent decision.
 
-Every itinerary carries a `mode`: either `full`, the default and the only one that accepts times, or
-`routing`. Routing mode has no calendar, so rules 6 and 7 have nothing to measure and are named in
-the report's `notChecked` list. That is not the same as `indeterminate`, which means data the rule
-needs was left out. Neither one is a pass, and both the CLI and the UI show them.
+Every itinerary carries a `mode`, either `full` or `routing`. `full` is the default, and the only
+mode that accepts times. Routing mode has no calendar. Rules 6 and 7 then have nothing to measure,
+and the report names them in its `notChecked` list. `notChecked` is not the same as `indeterminate`,
+which means that the input left out data the rule needs. Neither one is a pass, and both the CLI and
+the UI show them.
 
 ```
 $ swipl prolog/cli.pl -- route "LHR-BA-X/JFK-AA-X/LAX-QF-X/SYD-QF-X/SIN-BA-LHR"
@@ -125,9 +128,9 @@ Checks — 1 failed, 16 ok, 1 not run, 7 n/a. Re-run with --checks to list them.
 
 ### What it earns
 
-This is a separate question, answered by a separate operation over the same annotated itinerary. It
-runs no fare rules. A journey that cannot be sold can still be priced for what it would earn, and a
-perfectly valid one can be unpriceable.
+What a ticket earns is a separate question. A separate operation answers it over the same annotated
+itinerary, and it runs no fare rules. A journey that cannot be sold can still be priced for what it
+earns. A valid journey can be unpriceable.
 
 ```
 $ swipl prolog/cli.pl -- earn prolog/test/fixtures/lhr_classes.json
@@ -142,44 +145,48 @@ Qantas Frequent Flyer
   bands table read 2026-08-11 from https://www.qantas.com/en-au/frequent-flyer/calculators/…
 ```
 
-Every line says which category it resolved, from which row, which route basis priced it, and how far
-the sector was measured to be. This is the earn register, the counterpart of the check register
-above. Unlike the check register it is on by default, because a points figure looks as though it was
-*calculated*, and this one was looked up in a table with no version, no clause numbers and no notice
-period. The fetch date follows the totals for the same reason.
+Every line says which category it resolved, from which row, which route basis priced it, and the
+measured distance of the sector. This is the earn register, the counterpart of the check register in
+[What passed, and by how much](#what-passed-and-by-how-much).
 
-**Who sold the sector decides which table prices it**, and the two registered programmes read their
-tables in quite different ways. Qantas works from region pairs and mileage bands. Asia Miles works
-from distance zones for Cathay's own flights, and from a percentage of the distance flown for its 25
-partners. [`DESIGN.md`](DESIGN.md#what-the-ticket-earns) sets out both models, explains why a class
-alone sometimes cannot settle a rate, and shows how the answer says so.
+The earn register is on by default and the check register is not. A points figure looks as though
+something *calculated* it. This figure came from a table with no version, no clause numbers and no
+notice period. The fetch date follows the totals for the same reason.
+
+**Who sold the sector decides which table prices it.** The two registered programmes read their
+tables in different ways. Qantas works from region pairs and mileage bands. Asia Miles works from
+distance zones for Cathay's own flights, and from a percentage of the distance flown for its 25
+partners. [`DESIGN.md`](DESIGN.md#what-the-ticket-earns) sets out both models. It explains why a
+class alone sometimes cannot settle a rate, and shows how the answer says so.
 
 **A membership tier changes the answer, and says where.** `"members": {"qff": {"tier": "gold"}}`
-adds Qantas' status bonus: 50% at Silver, 75% at Gold, 100% at Platinum. It reaches Qantas Points and
-not Status Credits, which comes from the currency's own `bonus_applies` flag rather than a
-conditional anywhere. It is also a benefit of flying Qantas rather than of holding a card, so the
-same journey carries a bonus on one sector and none on the next. Each figure shows the split, as in
-`23,625 Qantas Points (13,500 + 10,125 Gold)`. A tier the programme does not publish is refused
-rather than quietly priced at the base rate, which a member who mistyped it could not otherwise tell
-from having no status at all.
+adds the Qantas status bonus: 50% at Silver, 75% at Gold, 100% at Platinum. The bonus reaches Qantas
+Points and not Status Credits. That split comes from the `bonus_applies` flag on each currency, not
+from a conditional anywhere. The bonus is also a benefit of flying Qantas rather than of holding a
+card. Thus the same journey carries a bonus on one sector and none on the next. Each figure shows
+the split, as in `23,625 Qantas Points (13,500 + 10,125 Gold)`.
 
-**Nothing that could not be priced is reported as zero.** A sector comes back `undecided` if its
-class was not given, its operating carrier is unnamed, or its category depends on a table that is not
-loaded. The journey total then reads "0 Qantas Points or more (5 sectors unpriced)" rather than a
-smaller number that looks complete. A rate a table publishes as a dash is a third thing again: "no
-Status Credits", which is a fact rather than a gap.
+A tier the programme does not publish is refused. The alternative is a quiet price at the base rate. A member who mistyped the tier
+cannot tell that from having no status at all.
+
+**A sector that cannot be priced never reads as zero.** A sector comes back `undecided` in three
+cases: the input gave no class, the operating carrier is unnamed, or the category depends on a
+table that is not loaded. The journey total then reads "0 Qantas Points or more (5 sectors unpriced)". A
+smaller number would look complete. A rate that a table publishes as a dash is a third thing again.
+It reads "no Status Credits", which is a fact rather than a gap.
 
 You can ask for more than one programme at once. The reply carries sub-totals per programme and **no
-ranking between them**. A mile and a Status Point cannot be compared without a valuation, valuations
-are opinions, and every number here traces back to a row. See
+ranking between them**. A comparison of a mile with a Status Point needs a valuation, and a valuation
+is an opinion. Every number here traces back to a row. See
 [`PLANS/05-loyalty-earning.md`](PLANS/05-loyalty-earning.md) for the design and what is still
 missing.
 
 ### What passed, and by how much
 
-"No rule was broken" is a claim about coverage that a reader has no way to check, and the number a
-cap was cleared by is what a fare-construction tool actually gets asked. So every report carries a
-**check register** alongside the violations: one line per rule, saying what it measured.
+"No rule was broken" is a claim about coverage, and a reader has no way to test it. A
+fare-construction tool also gets asked by how much a cap was cleared. Thus every report carries a
+**check register** beside the violations. The register gives one line per rule, and says what that
+rule measured.
 
 ```
 $ swipl prolog/cli.pl -- validate prolog/test/fixtures/lhr_classic.json --checks
@@ -194,114 +201,125 @@ Checks — 18 ok, 7 n/a:
   [8]          ok        Stopovers                             The journey has 4 stopovers. It ne…
 ```
 
-Every line is written to be read once. Short sentences, one fact each, common words, and continents
-spelled the way a person says them rather than the way the table keys them: `europe_middle_east` is
-a key, "Europe & Middle East" is a place. The report carries its own table of those names, so the
-page never has to guess at one or wait for a second request before it can render the first report.
+Every line is written to be read once: short sentences, one fact each, and common words. Continents
+are spelled the way a person says them, not the way the table keys them. `europe_middle_east` is a
+key, "Europe & Middle East" is a place. The report carries its own table of those names. Thus the
+page never has to guess at a name, and never has to wait for a second request before it shows the
+first report.
 
-The four ways a rule can come out other than pass or fail are kept distinct on purpose. `undecided`
-means the input left data out. `not run` means the input *mode* cannot answer the rule. `n/a` means
-the itinerary never touches the rule at all: 4(l) with no Australian sectors is not a restriction
-cleared. The whole register is withheld when the input has errors, because caps measured over an
-itinerary that did not parse describe a journey nobody submitted.
+A rule can come out in four ways other than pass or fail, and each stays distinct on purpose.
+`undecided` means that the input left data out. `not run` means that the input *mode* cannot answer
+the rule. `n/a` means that the itinerary never touches the rule at all: 4(l) with no Australian
+sectors is not a restriction cleared.
+
+The report withholds the whole register when the input has errors. Caps measured over an itinerary
+that did not parse describe a journey nobody submitted.
 
 ### Web UI
 
-The page in [`web/`](web/) is served at `/` by `swipl prolog/cli.pl -- serve`. It is also a static
-site that works with no server behind it at all — see [In the browser](#in-the-browser). The report
-is the page: on a wide screen the form takes a sidebar and the answer takes the rest. There are two
-ways to enter a journey, on two tabs, because they are different jobs rather than one job at two
-levels of detail:
+`swipl prolog/cli.pl -- serve` serves the page in [`web/`](web/) at `/`. The same directory is a
+static site that works with no server behind it at all — see [In the browser](#in-the-browser). The
+report is the page. On a wide screen the form takes a sidebar and the answer takes the rest. There
+are two ways to enter a journey, on two tabs. They are two different jobs, not one job at two levels
+of detail:
 
 * **Routing** — one line, `LHR-BA-JFK-AA-X/LAX-JL-NRT-CX-HKG-QR-LHR`, sent as `{"route": …}` for
-  Prolog to parse. A routing that parses fills in the Segments tab, using the validator's own
-  reading of it, so you can refine it without retyping. The field wraps instead of scrolling
-  sideways, which the grammar allows for free: whitespace is a separator, so a routing broken across
-  lines parses exactly as one line does.
-* **Segments** — the flight-by-flight table, sent as `{"mode": …, "segments": […]}`. It has airport
-  typeahead (accent-folded, so `sao paulo` finds São Paulo and `belem` finds Belém), a per-segment
-  stop-kind column, a booking class, a fare family, and a switch for whether dates and times are
-  supplied at all. With no clock, the time columns are hidden rather than offered and then refused.
-  The fare-family column is hidden the same way when no registered earning programme prices one,
-  which the page learns from the validator rather than deciding for itself. This is the one view a
-  sidebar cannot hold — thirteen columns, 1,262px with dates and times shown — so opening it gives
-  the form the whole page and moves the answer underneath. Closing it puts both back. The panels
-  animate between the two arrangements rather than jumping.
+  Prolog to parse. A routing that parses fills in the Segments tab from the reading the validator
+  made, so you can refine it without retyping. The field wraps instead of scrolling sideways, which
+  the grammar allows for free. Whitespace is a separator, so a routing broken across lines parses
+  exactly as one line does.
+* **Segments** — the flight-by-flight table, sent as `{"mode": …, "segments": […]}`. It holds
+  airport typeahead (accent-folded, so `sao paulo` finds São Paulo and `belem` finds Belém), a
+  per-segment stop-kind column, a booking class, a fare family, and a switch for dates and times.
+  With no clock, the page hides the time columns rather than offer them and then refuse them. The
+  page hides the fare-family column the same way when no registered earning programme prices one.
+  It learns that from the validator rather than decide it alone. This is the one view a sidebar
+  cannot hold: thirteen columns, 1,262px with dates and times shown. So the tab gives the form the
+  whole page and moves the answer underneath. When you close the tab, both go back. The panels
+  animate between the two arrangements rather than jump.
 
-  Columns the whole ticket tends to share — the two carrier codes, the booking class, the fare family
-  and the kind of connection — **fill down** the way a spreadsheet's do. The focused cell carries a
-  small square at its corner. Drag it over the rows below, or press <kbd>Ctrl</kbd>+<kbd>D</kbd> to
-  reach the last segment, and the value is copied into every row it covers. It writes only where
-  typing would be allowed, so a surface sector keeps its empty carrier and the last segment keeps its
-  empty stop. The columns that identify one sector — the airports, the flight number, the times —
-  have no handle, because filling those down could only describe a journey nobody could fly.
-  **Mkt** and **Op** also fill *across* to each other, since a sector nobody codeshared has the same
-  code in both. Dragging down and across at once fills the rectangle, which puts a whole ticket on
-  one carrier in a single gesture. No other neighbouring columns mean the same kind of thing, so no
-  others fill sideways.
+Some columns hold a value that the whole ticket tends to share: the two carrier codes, the booking
+class, the fare family and the kind of connection. These columns **fill down** the way the columns of
+a spreadsheet do. The focused cell carries a small square at its corner.
 
-  The abbreviated headings say what they stand for on hover: **Mkt** the marketing carrier, whose
-  code is on the ticket, and **Op** the operating carrier, whose aircraft flies it.
+Drag that square over the rows underneath, and the page copies the value into every row it covers.
+To reach the last segment in one step, press <kbd>Ctrl</kbd>+<kbd>D</kbd>.
 
-The two tabs are two ways of writing one journey, so **opening either one converts what is in the
-other**. The table is sent through the `routing` operation and written out as one line, and a
-routing is read back into the table by the same annotation pass the validator uses. Nothing is
-converted when the two already agree, which is what stops a round trip through a tab deleting a date
-or a flight number — neither of which a routing can express. If the itinerary cannot be written as a
-routing at all, because a point is neither a transfer nor a stopover, or a carrier code is also an
-airport code, the Routing tab says which and why. It never quietly promotes the point and changes
-what the journey means.
+A fill writes only where typing is allowed. Thus a surface sector keeps its empty carrier, and the
+last segment keeps its empty stop. The columns that identify one sector have no handle: the
+airports, the flight number and the times. A fill down those columns can only describe a journey nobody
+can fly.
 
-**Help** in the masthead opens a panel explaining what a oneworld Explorer fare is, what this tool
-answers, and how to drive the page. What the fare *is* is prose. Every figure in it — the continent
-and flight counts, the stay limit, the cabins, the carrier count, the routing grammar — comes from
-the ruleset the validator reports, so there is no second copy to fall out of date.
+**Mkt** and **Op** also fill *across* to each other, because a sector nobody codeshared has the same
+code in both. A drag down and across at once fills the rectangle, and puts a whole ticket on one
+carrier in one gesture. No other neighbouring columns mean the same kind of thing, so no others fill
+sideways.
+
+The abbreviated headings say what they stand for on hover. **Mkt** is the marketing carrier, whose
+code is on the ticket. **Op** is the operating carrier, whose aircraft flies it.
+
+The two tabs are two ways of writing one journey. Thus **when you open either tab, the page converts
+what is in the other**. The `routing` operation writes the table out as one line. The same
+annotation pass that the validator uses reads a routing back into the table. The page converts
+nothing when the two already agree. That is what stops a round trip through a tab from deleting a
+date or a flight number, neither of which a routing can express.
+
+Sometimes the itinerary cannot be written as a routing at all. This happens when a point is neither
+a transfer nor a stopover, or when a carrier code is also an airport code. The Routing tab then says
+which point and why. It never quietly promotes the point and changes what the journey means.
+
+**Help** in the masthead opens a panel. The panel explains what a oneworld Explorer fare is, what
+this tool answers, and how to drive the page. The description of the fare is prose. Every figure in
+it comes from the ruleset the validator reports: the continent and flight counts, the stay limit,
+the cabins, the carrier count and the routing grammar. Thus there is no second copy to fall out of
+date.
 
 Cabin and passengers sit above the tabs. They describe the fare rather than the routing, and they
-survive switching tabs. The report panel gives the verdict, the fare basis, each violation with its
-citation and evidence, **the route drawn as a map**, and an expandable **Rules evaluated** register
-of every rule measured and what it measured. That includes the ones this input could not answer,
-which read `not run` there and are not called out separately above.
+survive a change of tab. The report panel gives the verdict, the fare basis, and each violation with
+its citation and evidence. It also gives **the route drawn as a map**, and an expandable **Rules
+evaluated** register of every rule measured and what it measured. That includes the rules this input
+cannot answer. They read `not run` in the register, and the report does not call them out on
+their own.
 
 The register is collapsed by default, because it runs four times the length of the verdict it
-supports. `ok` is the quietest thing in it: on a valid itinerary it is every row, and colouring them
-all would leave nothing for the one that is not. Editing the form after a verdict marks the report
-as out of date, rather than leaving a stale answer looking current.
+supports. `ok` is the quietest thing in it. On a valid itinerary, `ok` is every row, and colour on
+all of them would leave nothing for the one row that is not. When you edit the form after a verdict,
+the page marks the report as out of date. A stale answer never looks current.
 
-Validating scrolls the report into view when it is not already there — under the full-width Segments
-table it would otherwise be below the fold — and leaves the page alone when it is, which on a wide
-screen in the Routing tab it always is. When the page does scroll, a **Back to the segments** button
-floats over the answer until the form is on screen again, so the page that moved itself also offers
-the way back.
+When you validate, the page scrolls the report into view if the report is not already there. Under
+the full-width Segments table the report is otherwise below the fold. When the report is already in
+view, the page does not move, and on a wide screen in the Routing tab it always is. When the page
+does scroll, a **Back to the segments** button floats over the answer until the form is on screen
+again. Thus the page that moved itself also offers the way back.
 
-**The earning panel** is a panel of its own, because earning is a different question answered by a
-different operation. An itinerary that cannot be sold can still be priced for what it would earn, and
-a perfectly valid one can be unpriceable. Every registered programme gets a section, built from the
-validator's own list, so the page names no programme, no currency, no fare family and no tier of its
-own.
+**The earning panel** is a panel of its own, because earning is a different question and a different
+operation answers it. An itinerary that cannot be sold can still be priced for what it earns. A
+valid itinerary can be unpriceable. Every registered programme gets a section, built from the list
+the validator gives. Thus the page names no programme, no currency, no fare family and no tier of
+its own.
 
-The programme's name and its totals are the section heading, and are always on screen. Opening the
-section adds everything that makes those totals checkable: the figure for each sector with the row it
-was read off underneath, the estimate caveat, and the tables with the dates they were read. That
-per-segment register is the earn register, the counterpart of the check register. Sectors that could
-not be priced are grouped by the reason why, so a journey where nothing resolved reads as one fact
-rather than sixteen.
+The section heading holds the name of the programme and its totals, and is always on screen. When
+you open the section, it adds everything that makes those totals checkable: the figure for each
+sector with the source row underneath it, the estimate caveat, and the tables with the dates they
+were read. That per-segment register is the earn register, the counterpart of the check register.
+The panel groups the sectors it cannot price by the reason why. Thus a journey where nothing
+resolved reads as one fact rather than sixteen.
 
 **A membership tier lives inside the programme that publishes it.** `"members": {"qff": {"tier":
-"gold"}}` comes from a control in the Qantas section rather than from a row of settings above the
-panel, because it is a fact about the traveller's relationship with that one airline. Changing it
-re-prices without re-validating, since the itinerary did not change. Programmes are listed, never
-ranked: a mile and a Status Point cannot be compared without a valuation, and a valuation is an
-opinion.
+"gold"}}` comes from a control in the Qantas section, not from a row of settings above the panel.
+The tier is a fact about the relationship between the traveller and that one airline. When you
+change it, the page re-prices without re-validating, because the itinerary did not change. The page
+lists the programmes and never ranks them. A comparison of a mile with a Status Point needs a
+valuation, and a valuation is an opinion.
 
 **The route map** sits in the report, under the rules the journey broke.
-[`web/map.src.js`](web/map.src.js) draws it from the coordinates already in `annotations`: one
-great-circle arc per segment, dashed for a surface sector, with filled markers for stopovers and
-hollow ones for transfers. Hovering a connection in the panel beside it lights up the same airport
-on the map.
+[`web/map.src.js`](web/map.src.js) draws it from the coordinates already in `annotations`. Each
+segment gets one great-circle arc, dashed for a surface sector. Stopovers get filled markers and
+transfers get hollow ones. When you hover a connection in the panel beside the map, the same airport
+lights up on the map.
 
-**The itinerary lives in the URL**, so you can paste a routing into a message and get back a
-validated report. Opening a link fills in the form, picks the right tab, and validates.
+**The itinerary lives in the URL.** Thus you can paste a routing into a message, and the reader gets
+back a validated report. A link that you open fills in the form, picks the right tab, and validates.
 
 | Parameter | Holds |
 |---|---|
@@ -320,13 +338,14 @@ validated report. Opening a link fills in the form, picks the right tab, and val
 ```
 
 **Colour scheme** is a three-way control in the header: Auto, Light, Dark. Auto follows the OS and
-stores nothing, so a machine that has never been told otherwise keeps following it.
+stores nothing. Thus a machine that you never told otherwise keeps following the OS.
 
 ## Building
 
-Everything below is generated and **committed**, for the same reason `data/generated/airports.pl`
-is: a clone runs offline, and any change shows up as a reviewable diff. Nothing at runtime, and
-nothing in the Docker build, needs node.
+The table that follows lists files that are generated and **committed**.
+`data/generated/airports.pl` is committed for the same reason: a clone runs offline, and any change
+shows up as a reviewable diff. Nothing at runtime needs node, and nothing in the Docker build needs
+it.
 
 | Generated | From | By |
 |---|---|---|
@@ -351,35 +370,37 @@ npm run check:contrast     # WCAG check over the palette, no browser needed
 npm run test:wasm          # the browser build answers what the native one answers
 ```
 
-If you change a class in `web/index.html` or `web/app.js` and forget to rebuild, the page renders
-without that style. If you change a rule and forget, the page validates against the *old* rules,
-which is the worse of the two because nothing looks wrong. `npm run build` followed by
-`git status --porcelain -- web/` catches both, and the Pages workflow refuses to deploy without it.
+If you change a class in `web/index.html` or `web/app.js` and forget to rebuild, the page shows
+without that style. If you change a rule and forget to rebuild, the page validates against the *old*
+rules. The second is worse, because nothing looks wrong. `npm run build` and then
+`git status --porcelain -- web/` finds both, and the Pages workflow refuses to deploy without it.
 
-The server reads `web/` into memory **at load time**, so a change to any of these files normally
-needs a restart before it shows up. `--dev` turns that off:
+The server reads `web/` into memory **at load time**. A change to any of these files thus needs a
+restart before it shows up. `--dev` turns that off:
 
 ```sh
 swipl prolog/cli.pl -- serve --dev        # or: RTW_DEV_ASSETS=1 swipl prolog/daemon.pl …
 ```
 
-Each request then re-reads the file from the build directory and replies `Cache-Control: no-store`,
-so an edit plus a browser reload is the whole loop. It prints a warning at startup and falls back to
-the copy in the program if a file has gone. It is off unless you ask for it, because the path it
-re-reads from is the one baked in at compile time, which is right on the machine that compiled it
-and nowhere else. **Do not set it in production.** Reading the page into the program is what lets
-the container run read-only, with no filesystem access in the request path.
+Each request then re-reads the file from the build directory, and replies `Cache-Control: no-store`.
+An edit plus a browser reload is the whole loop. If a file has gone, the server prints a warning at
+startup and falls back to the copy in the program. `--dev` is off unless you ask for it, because the
+path it re-reads from is the one baked in at compile time. That path is right on the machine that
+compiled it and nowhere else.
+
+**CAUTION: Do not set `--dev` in production.** The container runs read-only, with no filesystem
+access in the request path. That is possible only because the page is read into the program.
 
 Both fonts are bundled under [`web/fonts/`](web/fonts/) rather than fetched from a CDN. The service
-is meant to run offline and read-only, and a font request would be the only outbound call the page
-makes. They are OFL-licensed; see [`web/fonts/NOTICE.md`](web/fonts/NOTICE.md).
+must run offline and read-only, and a font request can be the only outbound call the page makes. The
+fonts are OFL-licensed. See [`web/fonts/NOTICE.md`](web/fonts/NOTICE.md).
 
 ## In the browser
 
 The page never asks a server whether an itinerary is valid. It runs the validator itself: SWI-Prolog
-compiled to WebAssembly, loading an image built from the same `.pl` files the container runs. Nothing
-is reimplemented in JavaScript, so there is no second copy of a rule to fall out of step with the
-first.
+compiled to WebAssembly. The page loads an image built from the same `.pl` files the container runs.
+No rule is reimplemented in JavaScript, so there is no second copy of a rule to fall out of step
+with the first.
 
 **What it costs.** About 1.3 MB gzipped, in two files:
 
@@ -388,31 +409,30 @@ first.
 | `web/vendor/swipl-bundle-no-data.js` | 2.5 MB | 865 KB |
 | `web/rtw.pvm` | 416 KB | (already compressed) |
 
-The image carries the Prolog library with it, which is why the stock `swipl-web.data` is not shipped
-at all. That is what makes this pair about 700 KB smaller than serving the sources plus the standard
-library. It boots in roughly 50 ms, and a sixteen-segment itinerary then validates in about a
-millisecond, which is faster than the round trip it replaces.
+The image carries the Prolog library with it. Thus the stock `swipl-web.data` is not shipped at all,
+and this pair is about 700 KB smaller than the sources plus the standard library. The image boots in
+about 50 ms. A sixteen-segment itinerary then validates in about a millisecond, which is faster than
+the round trip it replaces.
 
 [`DESIGN.md`](DESIGN.md#in-the-browser-webassembly) covers what the WebAssembly build constrains,
 and how the two engines are held to the same answers.
 
 ### GitHub Pages
 
-`web/` is the site. Every build output in it is committed, and it uses no absolute paths, so it can
-be served from anywhere — including `https://<user>.github.io/<repo>/`. That is why every path on
-the page is relative: an absolute `/app.css` works behind the service and 404s under a project
-subpath.
+`web/` is the site. Every build output in it is committed, and it uses no absolute paths. Thus you
+can serve it from anywhere, including `https://<user>.github.io/<repo>/`. Every path on the page is
+relative for that reason. An absolute `/app.css` works behind the service and returns 404 under a
+project subpath.
 
-[`.github/workflows/pages.yml`](.github/workflows/pages.yml) runs the Prolog suite, rebuilds every
-generated file, refuses to continue if the result differs from what was committed, runs the parity
-test and the contrast check, then publishes `web/`. The freshness check is the one that matters. A
-stale `rtw.pvm` would publish rules that are not the ones in the source tree, and nothing downstream
-would notice.
+[`.github/workflows/pages.yml`](.github/workflows/pages.yml) runs the Prolog suite. It rebuilds every
+generated file, and stops if the result differs from what was committed. It runs the parity test and
+the contrast check. Then it publishes `web/`. The freshness check is the one that matters. A stale
+`rtw.pvm` publishes rules that are not the ones in the source tree, and nothing downstream notices.
 
-Pages has to be pointed at Actions once, by hand: **Settings → Pages → Build and deployment →
-Source: GitHub Actions**.
+Point Pages at Actions once, by hand: **Settings → Pages → Build and deployment → Source: GitHub
+Actions**.
 
-To look at the static site locally, serve the directory with anything:
+To look at the static site locally, serve the directory with any static server:
 
 ```sh
 python3 -m http.server 8000 --directory web      # then http://localhost:8000/
@@ -420,27 +440,27 @@ python3 -m http.server 8000 --directory web      # then http://localhost:8000/
 
 ## Deployment
 
-Deploy the service when something other than a browser needs to ask. The HTTP API below is the only
-way to validate an itinerary from a script, a scheduler or another service. It serves the same page
-as the static site, and that page runs the same WebAssembly validator either way. The container is
-not doing the validating for it.
+Deploy the service when something other than a browser needs to ask. [The HTTP API](#http-api) is
+the only way to validate an itinerary from a script, a scheduler or another service. The service
+serves the same page as the static site. That page runs the same WebAssembly validator either way,
+and the container does not validate for it.
 
 `cli.pl serve` is for development. It parks the main thread on a message that never arrives, so a
-`SIGTERM` kills work in flight. Production uses [`prolog/daemon.pl`](prolog/daemon.pl), which is
-`library(http/http_unix_daemon)` plus the application. That gives you the whole daemon CLI —
-`--port --ip --user --group --workers --pidfile --fork --syslog --https --certfile --keyfile` — and
-the signal handling: SIGINT and SIGTERM shut down without abandoning in-flight requests, SIGHUP
-reloads, and SIGUSR1 reopens logs.
+`SIGTERM` kills work in flight. In production, use [`prolog/daemon.pl`](prolog/daemon.pl), which is
+`library(http/http_unix_daemon)` plus the application. It gives you the whole daemon CLI:
+`--port --ip --user --group --workers --pidfile --fork --syslog --https --certfile --keyfile`. It
+also gives you the signal handling. SIGINT and SIGTERM shut down without abandoning in-flight
+requests. SIGHUP reloads, and SIGUSR1 reopens logs.
 
 ### Docker
 
-Build. The airport table is committed, so the build needs no network and nothing is compiled:
+Build the image. The airport table is committed, so the build needs no network and compiles nothing:
 
 ```sh
 docker build -t rtw-validator .
 ```
 
-Run. The first form is enough to try it; the second is how to deploy it:
+Run the image. The first form is enough for a trial. The second form is how to deploy it:
 
 ```sh
 # quick look — the UI is then at http://localhost:8080
@@ -453,9 +473,8 @@ docker run -d --name rtw -p 8080:8080 \
   rtw-validator
 ```
 
-Everything after the image name is passed to the daemon, so `CMD` is where you change the port or
-the worker count. Note that `-p` maps the *host* port to the container's, so both have to change
-together:
+Docker passes everything after the image name to the daemon. Change the port or the worker count in
+`CMD`. `-p` maps the *host* port to the container port, so both must change together:
 
 ```sh
 docker run -d --name rtw -p 9000:9000 rtw-validator --port=9000 --workers=32
@@ -478,38 +497,40 @@ docker run --rm -i --entrypoint swipl rtw-validator \
   /app/prolog/cli.pl -- route "NYC-BA-X/LON-QR-SIN-QF-SYD-QF-X/LAX-AA-NYC"
 ```
 
-**Building on Apple Silicon for an x86 host.** The image is architecture-specific, and a
-`linux/arm64` image will not start on a `linux/amd64` server:
+**A build on Apple Silicon for an x86 host.** The image is architecture-specific. A `linux/arm64`
+image does not start on a `linux/amd64` server:
 
 ```sh
 docker buildx build --platform linux/amd64 -t rtw-validator:amd64 --load .
 ```
 
 Access logging is off unless `RTW_HTTP_LOG` names a file. A reverse proxy usually logs this better,
-and merely loading `library(http/http_log)` would otherwise write `httpd.log` into the working
-directory. To turn it on, give the container somewhere writable, since the root filesystem is not.
-The `mode=1777` matters: a bare `--tmpfs` mounts root-owned, the server runs as uid 10001, and
-`library(http/http_log)` swallows the resulting permission error rather than failing loudly.
+and to load `library(http/http_log)` at all writes `httpd.log` into the working directory. To turn
+logging on, give the container a writable path, because the root filesystem is not writable. The
+`mode=1777` matters: a bare `--tmpfs` mounts root-owned, the server runs as uid 10001, and
+`library(http/http_log)` swallows the permission error rather than fail loudly.
 
 ```sh
 docker run -d --name rtw -p 8080:8080 --read-only --tmpfs /var/log:mode=1777 \
   -e RTW_HTTP_LOG=/var/log/rtw-http.log rtw-validator
 ```
 
-The image reads two environment variables. One is `RTW_HTTP_LOG` above. The other is
-`RTW_DEV_ASSETS`, which should never be set here: it makes the server re-read the UI from disk on
-every request, and that is the one thing the read-only, no-filesystem-in-the-request-path design
-exists to avoid. See [Web UI](#web-ui).
+The image reads two environment variables. The first is `RTW_HTTP_LOG`. The second is
+`RTW_DEV_ASSETS`.
 
-The image runs as uid 10001 with every capability dropped, has no writable path, and ships neither
-the test suite nor the fixtures. `HEALTHCHECK` polls `/api/health` every 30 s. The base image is
-pinned to `swipl:10.0.2` rather than `:stable`, which moves. If you want to pin harder than that,
+**CAUTION: Do not set `RTW_DEV_ASSETS` on the container.** It makes the server re-read the UI from
+disk on every request. The read-only design, with no filesystem in the request path, exists to
+prevent that. See [Web UI](#web-ui).
+
+The image runs as uid 10001 with every capability dropped. It has no writable path, and ships
+neither the test suite nor the fixtures. `HEALTHCHECK` polls `/api/health` every 30 s. The base
+image is pinned to `swipl:10.0.2` rather than `:stable`, which moves. For a harder pin,
 `docker buildx imagetools inspect swipl:10.0.2` gives you a digest.
 
 ### systemd
 
-Use `Type=simple` with `--no-fork`. Do **not** use `Type=forking`, which would wait for a parent
-that never exits:
+Use `Type=simple` with `--no-fork`. Do **not** use `Type=forking`. It waits for a parent that never
+exits.
 
 ```ini
 [Service]
@@ -522,7 +543,7 @@ Restart=on-failure
 ```
 
 Only the parent needs to be root, and only to bind a privileged port. `--user` drops privileges
-afterwards.
+after that.
 
 ### HTTP API
 
@@ -537,22 +558,27 @@ afterwards.
 | `GET` | `/api/health` | status and ruleset version |
 | `GET` | `/` | the bundled web UI |
 
-Errors come back as `{"error": ..., "message": ...}`: `400 invalid_request` for malformed input,
-`413 request_too_large`, `503 timeout`, and `500 internal_error`. Request bodies are capped at
-128 KB and 100 segments, and each validation runs under a 10-second limit. All three limits live in
-[`prolog/data/limits.pl`](prolog/data/limits.pl), alongside the fare caps.
+Errors come back as `{"error": ..., "message": ...}`. The codes are `400 invalid_request` for
+malformed input, `413 request_too_large`, `503 timeout`, and `500 internal_error`. A request body is
+capped at 128 KB and 100 segments, and each validation runs under a 10-second limit. All three
+limits live in [`prolog/data/limits.pl`](prolog/data/limits.pl), with the fare caps.
 
 `/api/ruleset` exists so a web UI never hardcodes rule data. `/api/programs` is its counterpart on
 the earning side, for the same reason: the page names no programme, no currency and no table.
 
-Every validate response carries two things a UI needs. First, a `checks` array, holding
-`{rule, citation, label, outcome, detail}` for every rule measured — see
-[What passed, and by how much](#what-passed-and-by-how-much). Second, an `annotations` object,
-holding the derived route, the collapsed continent and traffic-conference sequences, each
-connection's ground time and stopover classification, `annotations.names` (the display name for
-every continent and traffic conference, so a client never has to invent one from the atom), and
-`annotations.routing`, the whole journey written back out as a routing string. Together these let a
-UI draw the itinerary and show *why* a rule fired, rather than only printing its message.
+Every validate response carries two things a UI needs.
+
+The first is a `checks` array. It holds `{rule, citation, label, outcome, detail}` for every rule
+measured. See [What passed, and by how much](#what-passed-and-by-how-much).
+
+The second is an `annotations` object. It holds the derived route, and the collapsed continent and
+traffic-conference sequences. It holds the ground time and the stopover classification of each
+connection. `annotations.names` holds the display name for every continent and traffic conference,
+so a client never has to invent one from the atom. `annotations.routing` holds the whole journey,
+written back out as a routing string.
+
+Together these let a UI draw the itinerary and show *why* a rule fired, rather than print only its
+message.
 
 ```sh
 curl -s -X POST localhost:8080/api/validate \
@@ -567,13 +593,13 @@ curl -s -X POST localhost:8080/api/routing \
 ```
 
 `/api/routing` is its own endpoint rather than a flag on validate, because it answers a different
-question and runs no rules. It works from the annotation pass, so a stop worked out from a two-hour
-connection and one declared `X/` come out the same way, and the routing reaches the same verdict as
-the itinerary it came from.
+question and runs no rules. It works from the annotation pass. Thus a stop worked out from a
+two-hour connection and a stop declared `X/` come out the same way. The routing reaches the same
+verdict as the itinerary it came from.
 
-It refuses, with `400` and the segment numbers, when a point is neither a transfer nor a stopover. A
-routing has no notation for "unknown", and a bare code means stopover, so guessing would change what
-the itinerary means. `annotations.routing` is `null` in the same case.
+When a point is neither a transfer nor a stopover, the endpoint refuses with `400` and the segment
+numbers. A routing has no notation for "unknown", and a bare code means stopover. A guess would thus
+change what the itinerary means. `annotations.routing` is `null` in the same case.
 
 ## Itinerary format
 
@@ -599,48 +625,52 @@ or, for the routing form:
 { "route": "NYC-BA-X/LON-QR-SIN-QF-SYD-QF-X/LAX-AA-NYC", "cabin": "business" }
 ```
 
-Only `segments[].{from,to}` and one of `segments`/`route` are required. Giving both is an error,
-because if they disagreed there would be no principled way to choose between them. `cabin` defaults
-to economy, `origin` to the departure point of segment 1, `type` to `flight`, and `mode` to `full`
-for `segments` and `routing` for `route`. Times are **local wall-clock** times; a zone designator is
-accepted and then thrown away. `stop` on the last segment is ignored, because the journey ends there
-and there is no intermediate point to describe.
+Only `segments[].{from,to}` and one of `segments`/`route` are required. To give both is an error. If
+the two disagreed, there would be no principled way to choose between them.
+
+`cabin` defaults to economy, `origin` to the departure point of segment 1, and `type` to `flight`.
+`mode` defaults to `full` for `segments` and to `routing` for `route`. Times are **local wall-clock**
+times, and a zone designator is accepted and then thrown away. `stop` on the last segment is
+ignored, because the journey ends there and there is no intermediate point to describe.
 
 `carrier` is shorthand that fills both carrier fields. `marketingCarrier` on its own leaves the
-operator unknown, rather than assuming there is no codeshare.
+operator unknown, rather than assume that there is no codeshare.
 
-`bookingClass` is the single RBD letter the segment is sold in, and it is what rule 5(b) reads. The
-*marketing* carrier decides which 5(b) row it is read against: 5(b) is about the code the fare is
+`bookingClass` is the single RBD letter the segment is sold in, and rule 5(b) reads it. The
+*marketing* carrier decides which 5(b) row to read it against. 5(b) is about the code the fare is
 sold in, and the seller is the one who sells it. 4(j) is the other way round, and turns on who
-operates. A missing `bookingClass` is *not* filled in for rule 5(b), which checks the class that was
-booked and would otherwise report a pass it never checked. Only the earning side reads the tariff to
-fill that gap, and only because an estimate is allowed to.
+operates.
 
-`fareFamily` is the carrier's branded fare: Cathay's `flex`, `essential` or `light`, which are the
-only fare brands either programme prices. No fare rule reads it at all, and it is the one thing
-Cathay's own Economy cannot be priced to a single number without. Both fields are optional, and
-neither affects any other rule.
+A missing `bookingClass` is *not* filled in for rule 5(b). That rule measures the class that was
+booked, and a filled-in value would report a pass it never measured. Only the earning side reads the
+tariff to fill that gap, and only because an estimate is permitted to.
 
-`members` is optional and read by nothing but the earning side:
+`fareFamily` is the branded fare of the carrier: `flex`, `essential` or `light` from Cathay. These
+are the only fare brands either programme prices. No fare rule reads `fareFamily` at all. Without
+it, Cathay's own Economy cannot be priced to a single number. Both fields are optional, and neither
+one affects any other rule.
+
+`members` is optional. Nothing but the earning side reads it:
 
 ```json
 "members": { "qff": { "tier": "gold" } }
 ```
 
-Missing information degrades honestly rather than quietly passing. A connection with neither a
+Missing information degrades honestly rather than pass in silence. A connection with neither a
 timestamp nor a declared stop kind makes rule 8 `indeterminate`, and the verdict `indeterminate`
-with it. A missing operating carrier makes 4(j) a `warning`. A journey that touches Cuba with no
-carrier named anywhere makes rule 15 `indeterminate` for the same kind of reason: the restriction is
-about who flies it, the sector that puts most itineraries into Cuba is American, and "it does not use
-American or Alaska" is not something the report may say about an input that named nobody. Warnings on
-their own still leave a verdict of `valid`.
+with it. A missing operating carrier makes 4(j) a `warning`.
+
+A journey that touches Cuba with no carrier named anywhere makes rule 15 `indeterminate`, for the
+same kind of reason. The restriction is about who flies it, and the sector that puts most
+itineraries into Cuba is American. The report thus cannot say "it does not use American or Alaska"
+about an input that named nobody. Warnings on their own still leave a verdict of `valid`.
 
 Routing mode relaxes which rules *apply*. It never relaxes the standard of evidence for the ones that
 do.
 
 Because the times are local, an eastbound trans-Pacific sector really does arrive at an earlier clock
 time than it departed: NRT 17:00 to LAX 10:00 the same day. Only a jump backwards wider than the span
-of world time zones is treated as a data error.
+of world time zones is a data error.
 
 ## Tests
 
@@ -660,45 +690,59 @@ Checked: 4(a)–4(l), 5(b), 6, 7, 8, 15, 19, and the section 0 continent-count t
 Not checked, because an itinerary cannot decide them: capacity limitations, GDS fare amounts, group
 travel, and voluntary-change fees.
 
-5(b) is checked only where the itinerary says what class it was sold in, and that field is optional
-— see `bookingClass` in [Itinerary format](#itinerary-format). With no class anywhere, the register
-says it had nothing to read. That is deliberately not `indeterminate`: a routing is a fare notation
-with nowhere to write a booking code, and treating that as missing data would make every routing
+5(b) is checked only where the itinerary says what class it was sold in, and that field is optional.
+See `bookingClass` in [Itinerary format](#itinerary-format). With no class anywhere, the register
+says it had nothing to read. That is deliberately not `indeterminate`. A routing is a fare notation
+with nowhere to write a booking code. To treat that as missing data would make every routing
 undecidable over a field the notation cannot express.
 
-Where a class *is* given, three outcomes are possible, because 5(b) has three kinds of class in it.
-The applicable code for the cabin passes. Anything the table does not name for that carrier is an
-error. In between sit the codes its notes allow in stated cases: a lower cabin's own code, `Y` on a
-First fare, `B` (or `H` on AA) on a DONE Business fare, and `A` on QR for services within the Middle
-East. Those pass too, and the register names the segments and the note they lean on. See
+Where a class *is* given, three outcomes are possible, because 5(b) holds three kinds of class. The
+applicable code for the cabin passes. Any code the table does not name for that carrier is an error.
+Between the two sit the codes the notes of 5(b) permit in stated cases:
+
+- The own code of a lower cabin.
+- `Y` on a First fare.
+- `B` (or `H` on AA) on a DONE Business fare.
+- `A` on QR for services within the Middle East.
+
+Those pass too, and the register names the segments and the note they lean on. See
 [Reading the rule](DESIGN.md#reading-the-rule-where-it-is-ambiguous) for why they are not warnings.
 
-One rule is checked but cannot be decided, and says so. Rule 19's real trigger is an infant
-*reaching* two years old between departure and the end of the journey, and the input carries an age
-rather than a date of birth. So a one-year-old who turns two next month and one who turned one last
-week look identical here. On a fare whose journey may run a full twelve months that is a real risk,
-and the consequence is a full child fare bought after the fact for the whole trip. So an infant
-stated as 1 draws a warning rather than silence. Supplying a date of birth would make it decidable.
-Nothing else would.
+One rule is measured but cannot be decided, and says so. The real trigger of rule 19 is an infant who
+*reaches* two years old between departure and the end of the journey. The input carries an age rather
+than a date of birth. Thus a one-year-old who turns two next month and one who turned one last week
+look identical here.
+
+The journey on this fare can run a full twelve months, so the risk is real. The consequence is a full
+child fare, bought after the fact, for the whole trip. Thus an infant stated as 1 draws a warning
+rather than silence. A date of birth would make the rule decidable. Nothing else would.
 
 ### What the ticket earns
 
 This is not part of Rule 3015 at all, which is why it is a separate operation. See
 [What it earns](#what-it-earns) and [`PLANS/05-loyalty-earning.md`](PLANS/05-loyalty-earning.md).
 
-Two programmes are registered. Qantas Frequent Flyer is priced off both of its published tables — its
-own for Qantas-marketed sectors, the partner one for everything else — with its status bonus applied.
-Asia Miles covers Cathay and its 25 partners under two different models: Cathay's own flights from a
-table of fixed amounts, and every partner as a percentage of the distance flown. Effective dating and
-Cathay's tiers are what is left to do, and the tables that have not been captured are listed in
-[`prolog/data/earn/sources/README.md`](prolog/data/earn/sources/README.md).
+Two programmes are registered. Qantas Frequent Flyer is priced off both of its published tables,
+with its status bonus applied. One table is its own, for Qantas-marketed sectors. The other is the
+partner table, for everything else.
 
-Some things are out of scope in both programmes, on purpose: award bookings, which earn nothing;
-Qantas Loyalty Bonus, Points Club and lifetime credits; miles from anything that is not a flight; and
-any ranking of one programme against another, since a mile and a Status Point cannot be compared
-without a valuation, and a valuation is an opinion. Nine of Asia Miles' partners are outside oneworld
-and so cannot appear on an Explorer fare at all. They are priced anyway, because the table publishes
-them, and leaving rows out of a transcription is how a transcription stops being one.
+Asia Miles covers Cathay and its 25 partners under two different models. Cathay's own flights come
+from a table of fixed amounts. Every partner is a percentage of the distance flown. Effective dating
+and the Cathay tiers are what is left to do.
+[`prolog/data/earn/sources/README.md`](prolog/data/earn/sources/README.md) lists the tables that are
+not yet captured.
+
+Four things are out of scope in both programmes, on purpose:
+
+- Award bookings, which earn nothing.
+- Qantas Loyalty Bonus, Points Club and lifetime credits.
+- Miles from anything that is not a flight.
+- Any ranking of one programme against another. A comparison of a mile with a Status Point needs a
+  valuation, and a valuation is an opinion.
+
+Nine partners of Asia Miles are outside oneworld, and thus cannot appear on an Explorer fare at all.
+They are priced anyway, because the table publishes them. To leave rows out of a transcription is how
+a transcription stops being one.
 
 [`DESIGN.md`](DESIGN.md) has the rest: how the rules are structured, the four geography taxonomies,
 the earning kernel and its plugin protocol, the WebAssembly target, and the test suites.
