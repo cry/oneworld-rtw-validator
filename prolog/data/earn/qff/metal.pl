@@ -28,7 +28,8 @@
 
 %! metal_carrier(?Carrier) is nondet.
 %  The marketing carriers this table prices. Jetstar's rows are on the same page
-%  and are not here: an Explorer fare cannot be sold with a JQ flight number.
+%  and are not here, because an Explorer fare cannot be sold with a JQ flight
+%  number.
 metal_carrier(qf).
 
 %! metal_region_places(?Region, ?Places) is nondet.

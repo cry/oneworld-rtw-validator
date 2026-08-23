@@ -14,14 +14,14 @@
     The "All other flights" table: what a partner-marketed sector earns per
     one-way flight, by distance and earn category, when no region pair in the
     published table covers it. Phase 2 adds the region pairs, which take
-    precedence; these are the fallback and the only basis phase 1 resolves.
+    precedence. These bands are the fallback, and the only basis phase 1 resolves.
 
-    Base rate throughout -- no tier bonus, which is applied by the kernel from
-    data/earn/qff/tiers.pl.
+    These are base rates throughout. The tier bonus is applied by the kernel,
+    from data/earn/qff/tiers.pl.
 */
 
 %! partner_band(?Band, ?LowMiles, ?HighMiles) is nondet.
-%  Inclusive at both ends; `inf` is the open top of the table.
+%  Inclusive at both ends. `inf` is the open top of the table.
 partner_band(band(1, 100), 1, 100).
 partner_band(band(101, 250), 101, 250).
 partner_band(band(251, 500), 251, 500).

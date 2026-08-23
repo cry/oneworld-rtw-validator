@@ -51,9 +51,9 @@ cx_airline(zh, 'Shenzhen Airlines', partner).
 
 %! cx_zero_points(?Code) is nondet.
 %  Earns Asia Miles and no Status Points at all, on every sector. These nine are
-%  exactly the non-oneworld partners, which is a useful sanity check and an
-%  inference rather than something the calculator states -- so the list is the
-%  data and the pattern is only this comment.
+%  exactly the non-oneworld partners. That is a useful sanity check, but it is
+%  something we noticed rather than something the calculator states. So the list
+%  is the data, and the pattern is only this comment.
 cx_zero_points(ac).
 cx_zero_points(ca).
 cx_zero_points(nz).
@@ -66,9 +66,9 @@ cx_zero_points(lx).
 
 %! cx_coverage(?Code, ?Zones, ?Summary, ?Detail) is nondet.
 %  Which distance zones this airline was actually sampled in. Cathay was
-%  enumerated exhaustively; the partners were sampled 23-90 city pairs each, so a
-%  rate outside these zones was never seen. src/earn/cx.pl says so on the sector
-%  rather than leaving the reader to assume the table is complete.
+%  enumerated exhaustively. The partners were sampled at 23-90 city pairs each,
+%  so a rate outside these zones was never seen. src/earn/cx.pl says so on the
+%  sector, rather than leaving the reader to assume the table is complete.
 cx_coverage(nz, [5], 'zones 5 only', '3 pairs, 5697-5867 mi. Zones 1,2,3,4,6 unobserved').
 cx_coverage(os, [1], 'zones 1 only', '4 pairs, 193-488 mi. Zones 2,3,4,5,6 unobserved').
 cx_coverage(ac, [1, 2], 'zones 1-2', '26 pairs, 38-2287 mi. Zones 3,4,5,6 unobserved').

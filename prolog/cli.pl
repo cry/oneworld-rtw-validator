@@ -5,16 +5,16 @@
 %   swipl prolog/cli.pl -- route <routing> [--cabin business] [--json] [--checks]
 %   swipl prolog/cli.pl -- serve [--port 8080] [--dev]
 %
-% All three subcommands render the same report/5 term; the first two use the
-% text renderer in src/explain.pl and the service uses src/io/json_out.pl.
+% All three subcommands render the same report/5 term. The first two use the
+% text renderer in src/explain.pl; the service uses src/io/json_out.pl.
 
 :- initialization(main, main).
 
 :- ensure_loaded('load').
 :- use_module('server').
-% SWI 10 moved JSON out of the HTTP package: `library(json)` does not exist on
+% SWI 10 moved JSON out of the HTTP package. `library(json)` does not exist on
 % 9.x, and `library(http/json)` prints a deprecation notice on 10.x. Asking
-% which one is present is the only spelling that is silent on both.
+% which one is present is the only way to stay quiet on both.
 :- if(exists_source(library(json))).
 :- use_module(library(json)).
 :- else.
@@ -22,8 +22,8 @@
 :- endif.
 :- use_module(library(main)).
 
-% halt/1 unwinds through catch/3, so the exit code is carried out as a value
-% and the process is halted exactly once, outside the recovery goal.
+% halt/1 unwinds through catch/3. So the exit code is passed out as a value and
+% the process is halted exactly once, outside the recovery goal.
 main(Argv) :-
     catch(run(Argv, Code), Error, fatal(Error, Code)),
     halt(Code).
@@ -57,8 +57,9 @@ cmd_validate(File, Opts, Code) :-
 
 % --- route -----------------------------------------------------------------
 
-% The routing form goes through the same JSON reader rather than a second path
-% into the validator, so `route` and a posted {"route": ...} cannot drift.
+% The routing form goes through the same JSON reader instead of a second path
+% into the validator. That way `route` and a posted {"route": ...} cannot drift
+% apart.
 cmd_route(Route, Opts, Code) :-
     (   append(_, ['--cabin', Cabin|_], Opts)
     ->  Dict = _{ route: Route, cabin: Cabin }
@@ -68,10 +69,10 @@ cmd_route(Route, Opts, Code) :-
 
 % --- earn ------------------------------------------------------------------
 
-% A separate subcommand rather than a flag on validate, for the same reason
-% /api/routing is a separate endpoint: it answers a different question and runs
-% no fare rules. A journey that cannot be sold can still be priced for what it
-% would earn, and a journey that is perfectly valid can be unpriceable.
+% This is its own subcommand rather than a flag on validate, for the same
+% reason /api/routing is its own endpoint: it answers a different question and
+% runs no fare rules. A journey that cannot be sold can still be priced for
+% what it would earn, and a perfectly valid journey can be unpriceable.
 cmd_earn(Dict0, Opts, Code) :-
     (   append(_, ['--cabin', Cabin|_], Opts)
     ->  Dict = Dict0.put(cabin, Cabin)
@@ -97,8 +98,9 @@ asked_programs(Opts, Asked) :-
     ;   Asked = []
     ).
 
-% 1 where any sector could not be priced, matching what an indeterminate verdict
-% means for validate: the answer came back, and it is not the whole answer.
+% Exit 1 if any sector could not be priced. That matches what an indeterminate
+% verdict means for validate: an answer came back, but it is not the whole
+% answer.
 earn_exit_code(Report, Code) :-
     (   member(Program, Report.programs),
         member(Total, Program.totals),
@@ -141,9 +143,9 @@ read_json_file(File, Dict) :-
 % --- serve -----------------------------------------------------------------
 
 % --dev sets the same environment variable the daemon reads, so there is one
-% switch rather than two ways to say it. It must be set before server.pl's
-% initialization goal has run -- which it has by the time main/1 is called, so
-% the flag is re-applied here explicitly.
+% switch rather than two ways to say the same thing. The variable has to be set
+% before server.pl's initialization goal runs. By the time main/1 is called that
+% goal has already run, so the flag is applied again here by hand.
 cmd_serve(Opts, 0) :-
     (   append(_, ['--port', PortAtom|_], Opts),
         atom_number(PortAtom, Port)

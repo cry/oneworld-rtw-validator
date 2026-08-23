@@ -5,9 +5,9 @@
     "Minimum 2 stopovers required. Maximum 2 stopovers permitted in the
     continent of origin."
 
-    This rule depends entirely on the stopover classification in annotate.pl,
-    which is why an itinerary with neither timestamps nor declared stop kinds
-    produces `indeterminate` here rather than passing.
+    This rule rests entirely on the stopover classification in annotate.pl. That
+    is why an itinerary with neither timestamps nor declared stop kinds comes out
+    `indeterminate` here instead of passing.
 */
 
 :- use_module('../geo').
@@ -32,8 +32,8 @@ validate:violation(A, v(min_stopovers, '8', error, Msg, [count(N), min(Min)])) :
 validate:violation(A, v(origin_continent_stopovers, '8', error, Msg,
                         [continent(Cont), count(N), max(Max), airports(Airports)])) :-
     origin_continent(A, Cont),
-    % The dict access must sit inside the goal, not in the findall template:
-    % functional notation is hoisted out of a template, where P is still free.
+    % The dict access has to sit inside the goal, not in the findall template.
+    % Functional notation gets hoisted out of a template, where P is still free.
     findall(Airport,
             ( ann_point(A, P), P.kind == stopover, P.continent == Cont,
               iata(P.airport, Airport) ),
@@ -61,18 +61,18 @@ validate:violation(A, v(stopovers_undecidable, '8', indeterminate, Msg,
            '~w could not be read (after ~w). ~w no ground time and no declared stop kind, so the stopovers could not be counted.',
            [Unclassified, Where, Have]).
 
-% A declared stop kind is taken as authoritative -- the traveller knows what
-% was booked -- but where it contradicts the ground time or a surface sector,
-% resolving that silently would hide the fact that the stopover count depends
-% on which one is believed. So the disagreement is reported and the itinerary
-% is left valid, since neither source is wrong on its face.
+% A declared stop kind wins, because the traveller knows what was booked. But
+% where it contradicts the ground time or a surface sector, settling that
+% quietly would hide the fact that the stopover count depends on which source
+% you believe. So the disagreement is reported and the itinerary stays valid,
+% since neither source is obviously wrong.
 %
-% Which one won is read off the point rather than assumed: a declaration beats
-% the clock but does not beat a surface sector, so naming the declared kind
-% unconditionally states the opposite of what happened on exactly the sectors
-% where the passenger arranged their own travel. And the kind that won is the
-% number the 2-stopover minimum and the origin-continent cap are counted from,
-% so it is the one fact this message owes the reader.
+% Which one won is read off the point rather than assumed. A declaration beats
+% the clock but does not beat a surface sector, so always naming the declared
+% kind would state the opposite of what happened on exactly the sectors where
+% the passenger arranged their own travel. The kind that won is also the number
+% the 2-stopover minimum and the origin-continent cap are counted from, which
+% makes it the one fact this message owes the reader.
 validate:violation(A, v(stop_kind_conflict, '8', warning, Msg,
                         [segments([N]), airport(Airport),
                          declared(D), derived(Derived), used(Used)])) :-
@@ -104,8 +104,8 @@ conflict_reason(P, Reason) :-
 stopover_count(A, N) :-
     aggregate_all(count, ( ann_point(A, P), P.kind == stopover ), N).
 
-% If any connection could not be classified, the stopover total is a lower
-% bound, so the "too few stopovers" error is withheld and the indeterminate
+% If any connection could not be classified, the stopover total is only a lower
+% bound. So the "too few stopovers" error is held back, and the indeterminate
 % violation below carries the report instead.
 any_indeterminate_point(A) :-
     ann_point(A, P),
@@ -116,9 +116,9 @@ origin_continent(A, Cont) :-
     A.origin \== unknown,
     airport_continent(A.origin, Cont).
 
-% The unclassified count travels with the stopover count rather than in a check
-% of its own: a stopover total with four connections unread is a lower bound,
-% and reading the two numbers apart is what makes it look like a total.
+% The unclassified count travels with the stopover count rather than sitting in
+% a check of its own. A stopover total with four connections unread is a lower
+% bound, and splitting the two numbers apart is what makes it look like a total.
 validate:check(A, chk(min_stopovers, '8', 'Stopovers', Detail,
                       [min_stopovers, stopovers_undecidable, stop_kind_conflict])) :-
     stopover_count(A, N),

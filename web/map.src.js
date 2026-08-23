@@ -3,18 +3,19 @@
  * Draws the validated itinerary as a world map: land outline, graticule, one
  * great-circle arc per segment, one marker per point.
  *
- * There are deliberately no tiles. A slippy map over OpenStreetMap would need
- * the network on every pan, which is the one thing this service is built not to
- * need -- the fonts and the stylesheet are bundled for the same reason -- and
- * street-level tiles carry nothing legible at the only zoom a round-the-world
- * route is ever viewed at. d3-geo plus the Natural Earth 110m land outline is
- * 55 KB of data and renders the whole thing as vectors that scale for free.
+ * There are no tiles, on purpose. A slippy map over OpenStreetMap would need the
+ * network on every pan, and needing the network is the one thing this service is
+ * built to avoid -- the fonts and the stylesheet are bundled for the same
+ * reason. Street-level tiles also show nothing legible at the only zoom anyone
+ * ever views a round-the-world route at. d3-geo plus the Natural Earth 110m land
+ * outline is 55 KB of data, and it renders the whole thing as vectors that scale
+ * for free.
  *
- * Equirectangular, cut at the antimeridian. A closed loop around the globe
- * cannot be drawn on a rectangle without one cut somewhere; putting it in the
- * Pacific is where every round-the-world map puts it, and d3-geo does the
- * cutting itself, so a Pacific crossing correctly leaves one edge and re-enters
- * the other rather than drawing a wrong line back across the map.
+ * The projection is equirectangular, cut at the antimeridian. A closed loop
+ * around the globe cannot be drawn on a rectangle without a cut somewhere, and
+ * the Pacific is where every round-the-world map puts it. d3-geo does the
+ * cutting itself, so a Pacific crossing leaves one edge and re-enters the other
+ * instead of drawing a wrong line back across the map.
  */
 
 import { geoEquirectangular, geoPath, geoGraticule } from 'd3-geo';
@@ -23,10 +24,10 @@ import topology from 'world-atlas/land-110m.json';
 
 const LAND = feature(topology, topology.objects.land);
 
-// The poles are empty for this purpose, so the frame is cropped to the
-// latitudes traffic actually uses. Everything below derives from that, which is
-// why there is no fitExtent call: an equirectangular projection is linear in
-// both axes, so the numbers can just be stated.
+// Nothing flies over the poles here, so the frame is cropped to the latitudes
+// traffic actually uses. Everything below follows from that. There is no
+// fitExtent call because an equirectangular projection is linear in both axes,
+// so the numbers can simply be stated.
 const W = 900;
 const NORTH = 80;
 const SOUTH = -58;
@@ -50,17 +51,17 @@ function el(name, attrs = {}) {
   return node;
 }
 
-// A two-point LineString, not a polyline: d3-geo resamples it along the
-// geodesic, so this is the great circle the aircraft actually flies rather than
-// a straight line in projected space.
+// A two-point LineString, not a polyline. d3-geo resamples it along the
+// geodesic, so this draws the great circle the aircraft actually flies rather
+// than a straight line in projected space.
 const arc = (a, b) => ({
   type: 'LineString',
   coordinates: [[a.lon, a.lat], [b.lon, b.lat]]
 });
 
-// Origin and final point are termini rather than intermediate points, and the
-// server only classifies what lies between segments -- so anything without a
-// matching point is one end of the journey.
+// The origin and the final point are ends of the journey rather than
+// intermediate points, and the server only classifies what lies between
+// segments. So anything with no matching point is one end of the journey.
 function stops(ann) {
   const segs = ann.segments || [];
   if (!segs.length) return [];
@@ -100,9 +101,10 @@ export function draw(container, ann) {
     svg.appendChild(line);
   }
 
-  // Labels are placed greedily and skipped where they would collide, so a dense
-  // corner of the map stays readable. Transfers go unlabelled first: the code is
-  // in the table beside this, and a stopover is the thing worth finding.
+  // Labels are placed greedily and skipped where they would collide, so a busy
+  // corner of the map stays readable. Transfers lose their labels first: their
+  // codes are in the table beside this, and a stopover is what a reader is
+  // looking for.
   const marks = el('g');
   const labels = el('g');
   const placed = [];

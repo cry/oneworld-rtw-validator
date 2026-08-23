@@ -2,8 +2,8 @@
 %
 %   swipl -g run_tests -t halt prolog/test/run_tests.pl
 %
-% Separate from prolog/load.pl so that a server process carries neither plunit
-% nor the fixture corpus.
+% This is separate from prolog/load.pl so a server process carries neither plunit
+% nor the fixtures.
 
 :- ensure_loaded('../load').
 

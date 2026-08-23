@@ -27,9 +27,9 @@
 
 /** <module> Airport -> country -> continent -> traffic conference.
 
-    The generated fact base is *included* rather than imported so that
-    airport/6 lives in this module and gets first-argument indexing on the
-    IATA code without an extra layer of indirection.
+    The generated fact base is *included* rather than imported. That puts
+    airport/6 in this module, where it gets first-argument indexing on the IATA
+    code with no extra layer in between.
 */
 
 :- use_module(fold).
@@ -46,10 +46,10 @@
 airport_known(A) :- airport(A, _, _, _, _, _), !.
 
 %! resolve_place(+Code, -Airport) is det.
-%  Metropolitan city codes are what routings are written in, so they are
-%  resolved to a representative airport before anything else sees them. An
-%  unrecognised code is passed through untouched and fails airport_known/1
-%  later, which is what turns it into an input_error violation.
+%  Routings are written in metropolitan city codes, so each one is turned into
+%  a representative airport before anything else sees it. A code we do not
+%  recognise passes through untouched and then fails airport_known/1 later,
+%  which is what turns it into an input_error violation.
 resolve_place(Code, Airport) :-
     (   city_code(Code, A)
     ->  Airport = A
@@ -57,22 +57,23 @@ resolve_place(Code, Airport) :-
     ).
 
 %! place_code_known(+Code) is semidet.
-%  True when a code names an airport or a metropolitan city -- that is, when a
-%  routing token would be read as a place. io/route_in and io/route_out both
-%  ask this about three-letter carrier designators, which are the only tokens
-%  the notation cannot tell apart by shape.
+%  True when a code names an airport or a metropolitan city, which is to say
+%  when a routing token would be read as a place. Both io/route_in and
+%  io/route_out ask this about three-letter carrier designators. Those are the
+%  only tokens the notation cannot tell apart by shape.
 place_code_known(Code) :- airport_known(Code), !.
 place_code_known(Code) :- city_code(Code, _).
 
 %! place_key(+Airport, -Key) is det.
-%  The identity a fare rule compares on. Rule 4 is written in cities -- 4(i)
-%  says "the same city pairs/sectors", 4(c) and 4(d) say "point" -- so LHR and
-%  LGW are one place to it and two places to the airport table. Airports
-%  outside any metropolitan area are their own key, which is the common case.
+%  The identity a fare rule compares on. Rule 4 is written in cities: 4(i) says
+%  "the same city pairs/sectors", and 4(c) and 4(d) say "point". So LHR and LGW
+%  are one place to the rule and two places to the airport table. An airport
+%  outside any metropolitan area is its own key, which is the common case.
 %
-%  Deliberately not applied at parse time: an itinerary that says LGW must keep
-%  saying LGW in the report, on the map, and in the routing it round-trips to.
-%  Only the rules that ask "is this the same point" fold the two together.
+%  This is not applied at parse time, on purpose. An itinerary that says LGW
+%  must keep saying LGW in the report, on the map, and in the routing it
+%  round-trips to. Only the rules that ask "is this the same point?" fold the
+%  two together.
 place_key(Airport, Key) :-
     (   city_of(Airport, City)
     ->  Key = City
@@ -83,16 +84,16 @@ place_key(Airport, Key) :-
 same_place(A, B) :- place_key(A, K), place_key(B, K).
 
 %! place_name(+Airport, -Display) is det.
-%  How a place is named once two airports have been folded into one: the
+%  How to name a place once two airports have been folded into one. Use the
 %  metropolitan code where there is one, so a 4(i) message about LHR-JFK and
-%  LGW-JFK reads "LON-NYC" rather than picking one airport and looking wrong.
+%  LGW-JFK reads "LON-NYC" instead of picking one airport and looking wrong.
 place_name(Airport, Display) :-
     place_key(Airport, Key),
     iata(Key, Display).
 
 %! iata(+Code, -Display) is det.
-%  Codes are held lower-case internally so they can be table keys; every
-%  message and every JSON field shows them the way a traveller writes them.
+%  Codes are stored lower-case so they work as table keys. Every message and
+%  every JSON field shows them the way a traveller writes them.
 iata(unknown, unknown) :- !.
 iata(A, U) :- upcase_atom(A, U).
 
@@ -110,7 +111,7 @@ airport_continent(A, Cont) :-
     ).
 
 %! airport_zone(+Iata, -Zone) is semidet.
-%  Only Europe/Middle East has zones; fails elsewhere.
+%  Only Europe and the Middle East have zones. Fails everywhere else.
 airport_zone(A, Zone) :-
     airport(A, Country, Region, _, _, Lon),
     (   zone_override(Country, Region, Lon, Z0)
@@ -158,10 +159,11 @@ is_transcontinental_us(From, To) :-
 %! ocean_crossing(+From, +To, -Ocean) is det.
 %  4(a): travel must be via the Atlantic and Pacific, one crossing each.
 %
-%  A crossing is identified by which traffic conferences a sector joins, not
-%  by geometry: TC1<->TC2 is the Atlantic and TC1<->TC3 is the Pacific. TC2<->TC3
-%  is the land/Indian-Ocean boundary and crosses neither. This is what makes
-%  the collapsed-TC-sequence invariant in r04_routing.pl equivalent to 4(a).
+%  A crossing is worked out from which traffic conferences a sector joins,
+%  never from geometry. TC1<->TC2 is the Atlantic and TC1<->TC3 is the Pacific.
+%  TC2<->TC3 is the land and Indian Ocean boundary, and crosses neither. This is
+%  why the collapsed-TC-sequence invariant in r04_routing.pl comes to the same
+%  thing as 4(a).
 ocean_crossing(From, To, Ocean) :-
     airport_tc(From, TF),
     airport_tc(To, TT),
@@ -175,8 +177,8 @@ tc_ocean(tc3, tc1, pacific).
 %! airport_search(+Query, +Limit, -Results) is det.
 %  Typeahead for the web UI. Exact IATA match first, then IATA prefix, then
 %  city prefix, then city substring. Case and accents are folded on both sides,
-%  so `belem` finds Belém and `sao paulo` finds São Paulo: the cities whose
-%  spelling is hardest to reproduce are the ones the search is most needed for.
+%  so `belem` finds Belém and `sao paulo` finds São Paulo. The cities that are
+%  hardest to spell are the ones people need the search for most.
 airport_search(Query, Limit, Results) :-
     fold_diacritics(Query, Q),
     findall(Rank-A,

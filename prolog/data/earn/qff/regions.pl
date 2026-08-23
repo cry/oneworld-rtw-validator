@@ -14,17 +14,17 @@
     2026-08-11 from
     https://www.qantas.com/en-au/frequent-flyer/calculators/earning-tables/partner-airlines
 
-    The third geography taxonomy in this repository, and deliberately its own
-    table. Qantas splits West Coast from East Coast USA/Canada, which the fare
-    rule does not; it files Santiago, Dallas and Tel Aviv as regions of their
-    own; and its "Northern Africa" reaches Kenya, Uganda, Somalia and the
+    The third geography taxonomy in this repository, and a table of its own on
+    purpose. Qantas splits West Coast from East Coast USA/Canada, which the fare
+    rule does not. It files Santiago, Dallas and Tel Aviv as regions in their own
+    right. And its "Northern Africa" reaches Kenya, Uganda, Somalia and the
     Seychelles. data/countries.pl already had to diverge from OurAirports'
-    continent column for the same kind of reason. A test asserts these stay
+    continent column for much the same reason. A test asserts these stay
     separate, so a later contributor cannot tidy up by aliasing one to another.
 
     A region is a set of places, a set of countries, or both. Places are matched
-    on geo:place_key/2, so a region naming New York covers JFK, LGA, EWR and
-    SWF -- which is what the published table means by a city.
+    on geo:place_key/2, so a region naming New York covers JFK, LGA, EWR and SWF,
+    which is what the published table means by a city.
 */
 
 %! region_places(?Region, ?Places) is nondet.
@@ -98,8 +98,8 @@ region_label(los_angeles, 'Los Angeles').
 region_label(east_coast_usa, 'East Coast USA').
 
 %! region_pair(?From, ?To, ?Category, ?Rates) is nondet.
-%  "Between X and Y", so the pair is symmetric and src/earn/qff.pl tries it
-%  both ways round rather than this file listing each row twice.
+%  "Between X and Y", so the pair works both ways. src/earn/qff.pl tries it in
+%  both directions, rather than this file listing each row twice.
 region_pair(sydney_melbourne_brisbane_gold_coast, west_coast_usa_canada, discount_economy,
             [ rate(points, fixed(4500)),
               rate(status_credits, fixed(45)) ]).
@@ -1093,7 +1093,7 @@ region_pair(new_zealand, east_coast_usa, first,
 
 %! region_pair_band(?Region, ?Band, ?Category, ?Rates) is nondet.
 %  Intra-USA Short Haul: a group of the region table that is itself banded on
-%  distance, with both endpoints in the one region. It is why route_basis/5
+%  distance, with both endpoints in the same region. It is why route_basis/5
 %  returns an opaque basis rather than "a region pair, else a band".
 region_pair_band(intra_usa, band(1, 400), discount_economy,
                  [ rate(points, fixed(100)),

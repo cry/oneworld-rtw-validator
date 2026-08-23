@@ -2,16 +2,16 @@
 
 /** <module> Routing strings, declared stop kinds and routing mode.
 
-    Three things are asserted here, in descending value:
+    Three things are asserted here, most valuable first:
 
     1. A routing string and a segment array describing the same journey must
-       produce the same verdict. That is what makes the routing form a genuine
+       produce the same verdict. That is what makes the routing form a real
        second front end rather than a separate, weaker validator.
-    2. Declaring stop kinds must decide rule 8 on its own, with no timestamps
-       anywhere -- otherwise routing mode would report `indeterminate` for
-       every itinerary and be useless.
-    3. Routing mode must not quietly pass the rules it cannot check. Rules 6
-       and 7 have to appear in the report's not-checked list.
+    2. Declared stop kinds must settle rule 8 on their own, with no timestamps
+       anywhere. Otherwise routing mode would report `indeterminate` for every
+       itinerary and be useless.
+    3. Routing mode must not quietly pass the rules it cannot check. Rules 6 and
+       7 have to appear in the report's not-checked list.
 */
 
 :- use_module(library(plunit)).
@@ -37,15 +37,16 @@ test(x_prefix_marks_a_transfer_and_bare_codes_are_stopovers) :-
                        rseg(3, flight, lax, lhr, _, _, _, _, _, unknown, _, _) ]).
 
 % Fare construction is written in city codes. The parser passes codes through
-% untouched -- resolution belongs to itinerary.pl, so that a city code posted
-% in a `segments` array resolves the same way; see the city_codes suite below.
+% untouched, because resolving them belongs to itinerary.pl. That way a city code
+% posted in a `segments` array resolves the same way; see the city_codes suite
+% below.
 test(city_codes_pass_through_the_parser_unresolved) :-
     route_segments('NYC-X/LON-SIN', Segs),
     assertion(Segs = [ rseg(1, _, nyc, lon, _, _, _, _, _, transfer, _, _),
                        rseg(2, _, lon, sin, _, _, _, _, _, unknown, _, _) ]).
 
 % The prefix is only read on a four-character token, so a three-letter code
-% beginning with X is a place, not a transfer at a two-letter one.
+% starting with X is a place, not a transfer at a two-letter one.
 test(three_letter_codes_starting_with_x_are_places) :-
     route_segments('HKG-XIY-PEK', Segs),
     assertion(Segs = [ rseg(1, _, hkg, xiy, _, _, _, _, _, stopover, _, _),
@@ -66,8 +67,8 @@ test(surface_sector_may_be_spaced_out) :-
     route_segments('BKK-//-SIN', B),
     assertion(A == B).
 
-% Two characters is an airline designator and three is a place, so the two
-% never need separating by anything but position.
+% Two characters is an airline designator and three is a place, so nothing but
+% position is needed to tell them apart.
 test(two_letter_tokens_are_the_carrier_of_the_following_leg) :-
     route_segments('LHR-BA-X/JFK-AA-LAX', Segs),
     assertion(Segs = [ rseg(1, _, lhr, jfk, ba, ba, _, _, _, _, _, _),
@@ -102,7 +103,7 @@ test(two_carriers_for_one_leg_is_reported) :-
 :- begin_tests(routing_mode).
 
 % The headline claim. route_classic is lhr_classic written as a routing, and
-% stops_declared is the same journey again as segments with declared stops and
+% stops_declared is the same journey again as segments, with declared stops and
 % no times. All three must reach the same verdict.
 test(routing_string_agrees_with_the_dated_itinerary) :-
     fixture_rules(lhr_classic, Dated),
@@ -112,9 +113,9 @@ test(routing_string_agrees_with_the_dated_itinerary) :-
     assertion(Routed == valid-[]),
     assertion(Declared == valid-[]).
 
-% Rule 8 is decided from the declarations alone: no timestamp is involved, so
-% marking every point X/ has to produce the too-few-stopovers error rather
-% than the undecidable one.
+% Rule 8 is settled from the declarations alone, with no timestamp involved. So
+% marking every point X/ has to produce the too-few-stopovers error rather than
+% the undecidable one.
 test(declared_stops_decide_rule_8_without_any_times) :-
     fixture_rules(route_all_transfers, Verdict-Ids),
     assertion(Verdict == invalid),
@@ -131,23 +132,23 @@ test(rules_needing_a_calendar_are_named_as_not_checked) :-
     fixture_not_checked(lhr_classic, None),
     assertion(None == []).
 
-% Rule 6 applies only to TC1 origins, so it is out of reach only when it would
-% otherwise have applied -- listing it for a London origin would be noise.
+% Rule 6 applies only to TC1 origins, so it counts as out of reach only where it
+% would otherwise have applied. Listing it for a London origin would be noise.
 test(rule_6_is_named_only_when_the_origin_is_in_tc1) :-
     routed_not_checked('LHR-BA-JFK-AA-LAX-QF-SYD-QF-X/SIN-BA-LHR', Europe),
     assertion(Europe == [max_stay]),
     routed_not_checked('JFK-AA-LHR-BA-BKK-QF-SYD-QF-LAX-AA-JFK', Tc1),
     assertion(Tc1 == [min_stay, max_stay]).
 
-% The severities stay distinct: a *full* itinerary missing its times is
+% The severities stay distinct. A *full* itinerary missing its times is
 % indeterminate, because the data those rules need was simply left out.
 test(routing_mode_is_not_the_same_as_missing_data) :-
     fixture_rules(mut_no_times, Verdict-Ids),
     assertion(Verdict == indeterminate),
     assertion(memberchk(stopovers_undecidable, Ids)).
 
-% A point with neither a time nor a declaration is still undecidable; routing
-% mode relaxes which rules apply, not the standard of evidence for rule 8.
+% A point with neither a time nor a declaration is still undecidable. Routing
+% mode relaxes which rules apply, never the standard of evidence for rule 8.
 test(undeclared_points_in_routing_mode_are_still_undecidable) :-
     itinerary_from_json(
         _{ mode: "routing",
@@ -171,15 +172,15 @@ test(a_declaration_overrides_the_ground_time) :-
     assertion(P.derived == stopover),
     assertion(P.kind == transfer).
 
-% Reported, not resolved in silence: which source is believed changes the
-% stopover count, and hiding that would hide why rule 8 came out as it did.
+% This is reported rather than settled quietly. Which source you believe changes
+% the stopover count, and hiding that would hide why rule 8 came out as it did.
 test(a_disagreement_is_reported_as_a_warning) :-
     fixture_rules(mut_stop_conflict, Verdict-Ids),
     assertion(Verdict == valid),
     assertion(Ids == [stop_kind_conflict]).
 
 % 4(g) surface travel is at the passenger's own expense and breaks the flown
-% journey whatever it is called, so here the declaration loses.
+% journey whatever anyone calls it, so here the declaration loses.
 test(a_surface_sector_outranks_a_declared_transfer) :-
     itinerary_from_json(
         _{ mode: "routing",
@@ -193,7 +194,7 @@ test(a_surface_sector_outranks_a_declared_transfer) :-
     assertion(P.kind == stopover),
     % And the warning has to say the derived kind won. It used to say "the
     % declared transfer is used" here, which is the opposite of the number rule
-    % 8's minimum and origin-continent cap were then counted from.
+    % 8's minimum and origin-continent cap were actually counted from.
     validate:violation(A, v(stop_kind_conflict, _, _, Msg, Evidence)),
     assertion(memberchk(used(stopover), Evidence)),
     assertion(sub_atom(Msg, _, _, _, 'the derived stopover is used')).
@@ -213,8 +214,8 @@ test(an_unknown_stop_word_is_rejected_rather_than_ignored) :-
           input_error(_), Caught = yes),
     assertion(Caught == yes).
 
-% Silently discarding the times would make rules 6 and 7 look unanswerable
-% when the data to answer them was supplied.
+% Quietly throwing the times away would make rules 6 and 7 look unanswerable when
+% the data to answer them was supplied.
 test(times_supplied_in_routing_mode_are_refused) :-
     catch(itinerary_from_json(
               _{ mode: "routing",
@@ -235,8 +236,8 @@ test(route_and_segments_together_are_refused) :-
 
 :- begin_tests(routing_json).
 
-% A client that renders `verdict` without `notChecked` would claim coverage the
-% report does not give, so the field has to be there to be rendered.
+% A client that renders `verdict` without `notChecked` claims coverage the report
+% does not give, so the field has to be there to render.
 test(not_checked_rules_reach_the_json) :-
     fixture(route_classic, Dict),
     itinerary_from_json(Dict, Itin),
@@ -247,7 +248,7 @@ test(not_checked_rules_reach_the_json) :-
     assertion(NC.rule == max_stay),
     assertion(NC.citation == '7').
 
-% Both classifications travel with the point, not just the winner, so a client
+% Both classifications travel with the point, not only the winner, so a client
 % can show which source decided it.
 test(points_carry_both_the_declared_and_the_derived_kind) :-
     ann_of(mut_stop_conflict, A),
@@ -269,9 +270,9 @@ test(mode_travels_with_the_annotations) :-
 
 % --- writing a routing back out --------------------------------------------
 
-% The reason io/route_out.pl is Prolog and not JavaScript: with both directions
-% here, "a routing survives the round trip" is a property the suite can assert
-% rather than a claim in a comment.
+% This is why io/route_out.pl is Prolog rather than JavaScript. With both
+% directions here, "a routing survives the round trip" becomes a property the
+% suite can assert instead of a claim in a comment.
 :- begin_tests(route_composition).
 
 route_of(Dict, Route) :-
@@ -286,22 +287,22 @@ test(a_routing_survives_the_round_trip) :-
            ( route_of(_{ route: R }, Out),
              assertion(Out == R) )).
 
-% A surface sector replaces both the separator and the carrier, so it has to
-% come back out that way and not as a dash.
+% A surface sector replaces both the separator and the carrier, so it has to come
+% back out that way rather than as a dash.
 test(a_surface_sector_round_trips_as_a_double_slash) :-
     route_of(_{ route: 'SYD-QF-X/HKG-QR-DOH-QR-LHR-BA-JFK-AA-LAX//SYD' }, Out),
     assertion(Out == 'SYD-QF-X/HKG-QR-DOH-QR-LHR-BA-JFK-AA-LAX//SYD').
 
 % City codes resolve to airports on the way in and stay resolved on the way out.
-% That is canonicalisation rather than loss: both name the same journey, and the
-% test pins it so the behaviour is a decision rather than a surprise.
+% That is canonicalisation rather than loss, because both name the same journey.
+% The test pins it down so the behaviour is a decision rather than a surprise.
 test(city_codes_come_back_as_airports) :-
     route_of(_{ route: 'LON-BA-NYC-AA-X/DFW-AA-LAX-QF-SYD//MEL-QF-X/SIN-BA-LON' }, Out),
     assertion(Out == 'LHR-BA-JFK-AA-X/DFW-AA-LAX-QF-SYD//MEL-QF-X/SIN-BA-LHR').
 
-% The point of the feature: a dated itinerary, whose stops were worked out from
-% the clock rather than declared, still writes down as a routing -- and that
-% routing must reach the same verdict as the itinerary it came from.
+% This is the point of the feature. A dated itinerary, whose stops were worked
+% out from the clock rather than declared, still writes down as a routing, and
+% that routing must reach the same verdict as the itinerary it came from.
 test(a_dated_itinerary_composes_and_agrees) :-
     fixture(lhr_classic, Dict),
     route_of(Dict, Route),
@@ -314,8 +315,8 @@ test(a_dated_itinerary_composes_and_agrees) :-
     assertion(V2 == V1).
 
 % A routing has no notation for "we do not know what this point is". Writing a
-% bare code would say stopover, which would change the itinerary and its
-% verdict, so composition fails and names the segments instead.
+% bare code would say stopover, which would change the itinerary and its verdict.
+% So writing it out fails, and names the segments instead.
 test(an_undecidable_point_refuses_to_compose) :-
     fixture(mut_no_times, Dict),
     itinerary_from_json(Dict, Itin),
@@ -325,7 +326,7 @@ test(an_undecidable_point_refuses_to_compose) :-
     assertion(Segments == [1, 2, 3, 4, 5, 6]).
 
 % Every report carries the routing, so an API client gets it without a second
-% request -- and null, not a guess, when it cannot be written.
+% request. When it cannot be written the field is null rather than a guess.
 test(the_report_carries_the_routing) :-
     fixture(lhr_classic, Dict),
     itinerary_from_json(Dict, Itin),
@@ -343,8 +344,8 @@ test(the_report_carries_the_routing) :-
 
 :- begin_tests(city_codes).
 
-% A regenerated airport table that drops one of these must fail here rather
-% than turn a city code into "not a known airport" at runtime.
+% A regenerated airport table that drops one of these must fail here, rather than
+% turn a city code into "not a known airport" at runtime.
 test(every_city_code_resolves_to_a_known_airport) :-
     findall(C, ( city_code(C, A), \+ airport_known(A) ), Bad),
     assertion(Bad == []).
@@ -353,8 +354,8 @@ test(every_city_code_has_a_name) :-
     findall(C, ( city_code(C, _), \+ city_name(C, _) ), Unnamed),
     assertion(Unnamed == []).
 
-% Aliasing rather than inventing a new kind of place is what makes this hold,
-% and it is what lets 4(i) see NYC-LON and JFK-LHR as one sector. It applies to
+% Aliasing, rather than inventing a new kind of place, is what makes this hold.
+% It is also what lets 4(i) see NYC-LON and JFK-LHR as one sector. It applies to
 % both front ends, because both resolve in itinerary.pl.
 test(a_city_code_is_the_same_place_as_its_airport) :-
     itinerary_from_json(_{ route: "NYC-LON" }, FromRoute),
@@ -366,9 +367,9 @@ test(a_city_code_is_the_same_place_as_its_airport) :-
     assertion(S.from == jfk),
     assertion(S.to == lhr).
 
-% The table has to run backwards too. 4(i) is written in city pairs and 4(c)
-% and 4(d) in points, so an airport that belongs to a metropolitan area has to
-% be findable from the airport.
+% The table has to run backwards too. 4(i) is written in city pairs, and 4(c) and
+% 4(d) in points, so given an airport we have to be able to find the metropolitan
+% area it belongs to.
 test(a_metro_airport_knows_its_city) :-
     assertion(city_of(lgw, lon)),
     assertion(city_of(lhr, lon)),
@@ -377,13 +378,13 @@ test(a_metro_airport_knows_its_city) :-
     assertion(same_place(lhr, lgw)),
     assertion(\+ same_place(lhr, man)).
 
-% Every member has to resolve, for the same reason the representatives do.
+% Every member has to resolve, for the same reason each representative does.
 test(every_metro_airport_resolves) :-
     findall(A, ( city_airports(_, As), member(A, As), \+ airport_known(A) ), Bad),
     assertion(Bad == []).
 
-% No airport may sit in two metropolitan areas, or city_of/2's commit picks one
-% arbitrarily and 4(i) starts depending on clause order.
+% No airport may sit in two metropolitan areas. Otherwise city_of/2 commits to
+% whichever it finds first, and 4(i) starts depending on clause order.
 test(no_airport_belongs_to_two_cities) :-
     findall(A-Cs,
             ( city_airports(_, As), member(A, As),
@@ -392,41 +393,42 @@ test(no_airport_belongs_to_two_cities) :-
             Overlaps),
     assertion(Overlaps == []).
 
-% 4(i) says "the same city pairs/sectors". LHR-JFK out and LGW-JFK back repeats
-% a city pair without repeating a three-letter code.
+% 4(i) says "the same city pairs/sectors". LHR-JFK out and LGW-JFK back repeats a
+% city pair without repeating any three-letter code.
 test(one_city_pair_flown_twice_from_different_airports) :-
     routed_rules('LHR-BA-JFK-AA-LAX-QF-SYD-QF-SIN-BA-LGW-BA-JFK-AA-ORD-BA-LHR', _-Ids),
     assertion(memberchk(dup_sector, Ids)).
 
-% 4(d) is about the point of origin, and a second London airport is that point.
+% 4(d) is about the point of origin, and a second London airport is that same
+% point.
 test(a_stop_at_another_airport_of_the_origin_city_is_via_the_origin) :-
     routed_rules('LHR-BA-JFK-BA-LGW-BA-NRT-JL-LHR', _-Ids),
     assertion(memberchk(origin_revisited, Ids)).
 
-% ...and finishing at one is finishing at the origin, not an OD surface sector.
+% ...and finishing at one is finishing at the origin, not an origin-destination
+% surface sector.
 test(finishing_at_another_airport_of_the_origin_city_is_finishing_at_home) :-
     routed_rules('LHR-BA-JFK-AA-LAX-QF-SYD-QF-X/SIN-BA-LGW', V-Ids),
     assertion(V-Ids == valid-[]).
 
 % Starting at one is starting at the origin too. A declared origin is the fourth
-% place the program asks "is this the same point", and comparing codes there
-% while comparing places everywhere else made the ordinary way of writing a fare
-% -- a city code against the airport it resolves to -- an input error, which
-% costs the whole check register.
+% place the program asks "is this the same point?". Comparing codes there while
+% comparing places everywhere else turned the ordinary way of writing a fare -- a
+% city code against the airport it resolves to -- into an input error, and an
+% input error costs the whole check register.
 test(a_declared_city_code_origin_matches_its_airport) :-
     origin_itinerary("LON", "LGW", ViaCity),
     assertion(ViaCity.errors == []),
     origin_itinerary("LHR", "LGW", ViaSibling),
     assertion(ViaSibling.errors == []).
 
-% The origin carried forward is the point the itinerary actually departs from,
-% so no message, map pin or annotation names an airport that is not in the
-% journey.
+% The origin carried forward is the point the itinerary actually departs from, so
+% no message, map pin or annotation names an airport that is not in the journey.
 test(a_matching_origin_resolves_to_the_departure_point) :-
     origin_itinerary("LON", "LGW", Itin),
     assertion(Itin.origin == lgw).
 
-% Still an error when the two are genuinely different places, and the message
+% It is still an error when the two really are different places, and the message
 % quotes the code that was given rather than the one it resolved to.
 test(an_origin_elsewhere_is_still_reported_as_given) :-
     origin_itinerary("CDG", "LGW", Itin),
@@ -450,8 +452,8 @@ origin_itinerary(Origin, From, Itin) :-
 :- begin_tests(carrier_codes).
 
 % HAC is Hokkaido Air System in the 4(j) affiliate table and Hachijojima in the
-% airport table. The notation cannot say which is meant, so a routing reads it
-% as the place -- the far likelier thing to write down.
+% airport table. The notation cannot say which is meant, so a routing reads it as
+% the place, which is by far the likelier thing to write down.
 test(a_three_letter_code_that_is_an_airport_stays_an_airport) :-
     route_segments('HND-HAC-OKD', Segs),
     assertion(Segs = [_, _]),
@@ -460,16 +462,16 @@ test(a_three_letter_code_that_is_an_airport_stays_an_airport) :-
     assertion(From == hnd),
     assertion(To == hac).
 
-% A three-letter designator that collides with nothing is still a carrier, so
-% the grammar is not simply capped at two characters.
+% A three-letter designator that collides with nothing is still a carrier, so the
+% grammar is not simply capped at two characters.
 test(a_three_letter_carrier_that_is_not_a_place_is_a_carrier) :-
     assertion(( carrier_code(hac), place_code_known(hac) )),
     findall(C, ( carrier_code(C), atom_length(C, 3), \+ place_code_known(C) ), Free),
     forall(member(C, Free), assertion(\+ place_code_known(C))).
 
-% The round trip is the property this notation exists to have. Composing HAC
-% would emit a string that parses back to a journey via Hachijojima, so it is
-% refused and named instead.
+% The round trip is the property this notation exists to have. Writing HAC out
+% would produce a string that parses back into a journey via Hachijojima, so it
+% is refused and named instead.
 test(an_ambiguous_carrier_is_refused_rather_than_composed) :-
     itinerary_from_json(
         _{ origin: "HND",

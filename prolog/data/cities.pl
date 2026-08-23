@@ -2,10 +2,10 @@
 
 /** <module> IATA metropolitan city codes.
 
-    Fare construction is written in city codes, not airport codes: a routing
+    Fare construction is written in city codes, not airport codes. A routing
     reads `NYC-X/LON-SIN`, never `JFK-X/LHR-SIN`. The airport table has no such
-    codes -- OurAirports lists airports -- so this table maps each multi-airport
-    city onto a representative airport.
+    codes, because OurAirports lists airports, so this table maps each
+    multi-airport city onto a representative airport.
 
     The table runs in both directions, and both are load-bearing.
 
@@ -15,20 +15,20 @@
     Backward, `city_of/2` says which metropolitan area an airport belongs to.
     That is what 4(i) is written in -- "the same city pairs / sectors cannot be
     flown more than once in the same direction" -- and what 4(c) and 4(d) mean
-    by a point. Without it LHR and LGW are two places, so LON-NYC flown out of
+    by a point. Without it, LHR and LGW are two places. Then LON-NYC flown out of
     Heathrow and back into Gatwick is not a repeat, an itinerary routed via its
     own origin city is not via the point of origin, and a journey that ends
     across town from where it started looks like it ended somewhere else.
 
-    Only airports in the generated table belong here; test/test_route.pl
-    asserts that every entry resolves, so a regenerated airport table that
-    drops an airport fails the suite rather than turning a city code into
-    "unknown airport" at runtime. Kyiv (IEV) is absent for exactly that
-    reason -- KBP currently has no scheduled service. Airports marketed under a
-    city's name but held by IATA as their own city are likewise absent: Paris
-    Beauvais (BVA), Westchester (HPN) and Kitchener/Waterloo (YKF) are not
-    members here, because grouping a place that the fare rule keeps separate
-    invents violations, which is the more expensive way to be wrong.
+    Only airports in the generated table belong here. test/test_route.pl checks
+    that every entry resolves, so a regenerated airport table that drops an
+    airport fails the suite rather than turning a city code into "unknown
+    airport" at runtime. Kyiv (IEV) is missing for exactly that reason: KBP
+    currently has no scheduled service.
+    Airports marketed under a city's name but held by IATA as their own city are
+    also absent. Paris Beauvais (BVA), Westchester (HPN) and Kitchener/Waterloo
+    (YKF) are not members here, because grouping a place the fare rule keeps
+    separate invents violations, and that is the more expensive way to be wrong.
 */
 
 %! city_airports(?City, ?Airports) is nondet.
@@ -64,8 +64,8 @@ city_code(City, Representative) :-
     city_airports(City, [Representative|_]).
 
 %! city_of(+Airport, -City) is semidet.
-%  Airports belong to at most one metropolitan area, so the first match is the
-%  only one and the search commits to it.
+%  An airport belongs to at most one metropolitan area, so the first match is
+%  the only match and the search commits to it.
 city_of(Airport, City) :-
     city_airports(C, Airports),
     memberchk(Airport, Airports),

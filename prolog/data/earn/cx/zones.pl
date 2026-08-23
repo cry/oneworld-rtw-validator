@@ -31,7 +31,7 @@
 */
 
 %! cx_zone(?Scheme, ?Position, ?Low, ?High, ?Region) is nondet.
-%  Inclusive at both ends; `inf` is the open top of each scheme. Region is
+%  Inclusive at both ends. `inf` is the open top of each scheme. Region is
 %  `any`, or `standard`/`enhanced` for the Cathay pair that share a distance
 %  band and are told apart by the endpoints.
 cx_zone(cx, 1, 1, 750, any).
@@ -63,7 +63,7 @@ cx_zone_label(partner, 6, 'Zone 6 (7,501 miles or above)').
 
 %! cx_zone_edges(?Scheme, ?Edges) is nondet.
 %  Where a great circle stops being a good enough stand-in for the airline's own
-%  sector mileage -- see src/earn/distance.pl.
+%  sector mileage. See src/earn/distance.pl.
 cx_zone_edges(cx, [750, 2750, 5000, 7500]).
 cx_zone_edges(partner, [750, 2750, 3700, 5000, 7500]).
 
@@ -78,13 +78,13 @@ cx_boundary(7500, clean, 'CLEAN. Bracketed to 7312-7796').
 %! cx_enhanced_country(?Country) is nondet.
 %  Either endpoint in one of these pulls a 751-2,750 mile Cathay sector onto the
 %  enhanced card. It is the one place a distance alone cannot decide a zone, and
-%  the reason route_basis/5 is handed the segment rather than only a number.
+%  the reason route_basis/5 is handed the segment rather than just a number.
 %
-%  Seven countries here and six on Cathay's own change notice, which omits
-%  Kazakhstan. The calculator is the authority and it pays the enhanced card:
-%  HKG-ALA returns 35/25/18 across the three economy fares, which is the
-%  enhanced column and not the standard one. The published list is the thing
-%  that is short, so do not trim this one to match it.
+%  There are seven countries here and six on Cathay's own change notice, which
+%  leaves out Kazakhstan. The calculator is the authority, and it pays the
+%  enhanced card: HKG-ALA returns 35/25/18 across the three economy fares, which
+%  is the enhanced column rather than the standard one. The published list is the
+%  one that is short, so do not trim this one to match it.
 cx_enhanced_country('JP').
 cx_enhanced_country('IN').
 cx_enhanced_country('BD').
@@ -94,9 +94,9 @@ cx_enhanced_country('KZ').
 cx_enhanced_country('ID').
 
 %! cx_override(?From, ?To, ?Position, ?Why) is nondet.
-%  City pairs whose card is not the one their distance predicts. Applied before
-%  the distance is looked at. Cathay publishes no reason for any of them, so the
-%  note is the observation rather than an explanation.
+%  City pairs whose card is not the one their distance predicts. These are applied
+%  before the distance is looked at. Cathay publishes no reason for any of them,
+%  so the note records what was observed rather than explaining it.
 cx_override(hkg, czx, 1, 'Great-circle 755 mi predicts Zone 2; actual card is Zone 1').
 cx_override(czx, hkg, 1, 'Great-circle 755 mi predicts Zone 2; actual card is Zone 1').
 cx_override(mfm, nkg, 2, 'Great-circle 738 mi predicts Zone 1; actual card is Zone 2').

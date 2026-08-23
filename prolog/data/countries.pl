@@ -7,24 +7,25 @@
 
 /** <module> ISO country -> fare-rule continent.
 
-    The base taxonomy here is the *IATA area* geography, not physical
-    geography, because that is what Rule 3015 section 0 is written against.
-    The rule's own parentheticals confirm it: "Europe (including Algeria,
-    Morocco, Russia west of the Urals and Tunisia)" is exactly the IATA Europe
-    area, and "Middle East (including Egypt, Libya and Sudan)" is the IATA
-    Middle East area with Libya moved across.
+    The base taxonomy here is the *IATA area* geography, not physical geography,
+    because that is what Rule 3015 section 0 is written against. The rule's own
+    parentheticals confirm it. "Europe (including Algeria, Morocco, Russia west
+    of the Urals and Tunisia)" is exactly the IATA Europe area, and "Middle East
+    (including Egypt, Libya and Sudan)" is the IATA Middle East area with Libya
+    moved across.
 
-    This is why the `continent` column in the OurAirports CSV must not be used:
-    it is physical geography. It puts Honolulu in Oceania (the fare rule needs
-    North America -- see 4(b)), Dubai and Amman in Asia (the fare rule needs
-    Europe/Middle East), and Casablanca in Africa (the fare rule needs Europe).
+    That is why the `continent` column in the OurAirports CSV must not be used:
+    it holds physical geography. It puts Honolulu in Oceania, where the fare rule
+    needs North America (see 4(b)); Dubai and Amman in Asia, where the fare rule
+    needs Europe/Middle East; and Casablanca in Africa, where the fare rule needs
+    Europe.
 
-    Russia is not listed below; it is split at the Urals by longitude in
-    data/overrides.pl.
+    Russia is not listed below. data/overrides.pl splits it at the Urals by
+    longitude.
 */
 
-% Group declarations expand into indexed country_continent/2 facts at load
-% time, so lookups are first-argument indexed rather than list scans.
+% Group declarations expand into country_continent/2 facts at load time, so a
+% lookup is a first-argument indexed match rather than a scan down a list.
 term_expansion(continent_group(Cont, List), Facts) :-
     findall(country_continent(C, Cont), member(C, List), Facts).
 term_expansion(zone_group(Zone, List), Facts) :-
@@ -49,11 +50,11 @@ continent_group(south_america,
 
 % --- TC2 -------------------------------------------------------------------
 
-% Europe/Middle East is one continent with two zones. The zone split matters
-% for 4(c)(b) (surface sectors within the Middle East), for 4(e)'s closing
-% sentence (which says "Europe" two lines after saying "Europe/Middle East" in
-% full, and means the zone), and for the section 12 "sectors within Middle
-% East" surcharge band, so it is tracked separately.
+% Europe/Middle East is one continent with two zones. The split is tracked
+% separately because three things need it: 4(c)(b), on surface sectors within
+% the Middle East; 4(e)'s closing sentence, which says "Europe" two lines after
+% writing "Europe/Middle East" in full, and means the zone; and the section 12
+% "sectors within Middle East" surcharge band.
 continent_group(europe_middle_east,
     [ 'AD','AL','AM','AT','AZ','BA','BE','BG','BY','CH','CY','CZ','DE','DK',
       'DZ','EE','ES','FI','FO','FR','GB','GE','GG','GI','GR','HR','HU','IE',
@@ -77,7 +78,7 @@ zone_group(middle_east,
       'SD','SY','YE'
     ]).
 
-% South Sudan stays in Africa; only Sudan is named by the rule text.
+% South Sudan stays in Africa. The rule text names only Sudan.
 continent_group(africa,
     [ 'AO','BF','BI','BJ','BW','CD','CF','CG','CI','CM','CV','DJ','EH','ER',
       'ET','GA','GH','GM','GN','GQ','GW','KE','KM','LR','LS','MG','ML','MR',
@@ -95,9 +96,9 @@ continent_group(asia,
       'TM','TW','UZ','VN'
     ]).
 
-% Cocos (CC) and Christmas Island (CX) are Australian external territories;
-% grouping them with Australia keeps PER-CCK/PER-XCH domestic rather than
-% making it look like an intercontinental departure.
+% Cocos (CC) and Christmas Island (CX) are Australian external territories.
+% Grouping them with Australia keeps PER-CCK and PER-XCH domestic, instead of
+% making them look like intercontinental departures.
 continent_group(south_west_pacific,
     [ 'AS','AU','CC','CK','CX','FJ','FM','GU','KI','MH','MP','NC','NF','NR',
       'NU','NZ','PF','PG','PW','SB','TO','TV','VU','WF','WS'

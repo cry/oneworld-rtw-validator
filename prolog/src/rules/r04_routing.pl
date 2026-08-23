@@ -2,8 +2,8 @@
 
 /** <module> Rule 4 -- flight application and routings.
 
-    Every clause below succeeds when the rule is *broken*. See src/validate.pl
-    for why.
+    Every clause below succeeds when the rule is *broken*. src/validate.pl says
+    why.
 */
 
 :- use_module('../geo').
@@ -22,18 +22,18 @@
 % 4(a) + 4(b) + 4(c): the traffic-conference cycle
 % ===========================================================================
 %
-% "Travel must be via the Atlantic and Pacific Oceans and only one crossing of
-% each ocean is permitted" (4a), "travel must be in a continuous forward
-% direction between TC1 - TC2 - TC3" (4b), and "must terminate at the same
-% point" (4c) are not three independent facts about a round-the-world
-% itinerary. Together they force the collapsed traffic-conference sequence to
-% be exactly a 3-cycle: [T0,T1,T2,T0] where [T0,T1,T2] is a rotation of
-% [tc1,tc2,tc3] or of its reverse.
+% Three clauses say related things about a round-the-world itinerary: "travel
+% must be via the Atlantic and Pacific Oceans and only one crossing of each
+% ocean is permitted" (4a), "travel must be in a continuous forward direction
+% between TC1 - TC2 - TC3" (4b), and "must terminate at the same point" (4c).
+% They are not three independent facts. Together they force the collapsed
+% traffic-conference sequence to be exactly a 3-cycle: [T0,T1,T2,T0], where
+% [T0,T1,T2] is a rotation of [tc1,tc2,tc3] or of its reverse.
 %
-% Checking that one property catches every 4(a)/4(b) failure at once, and
-% yields a message that names the actual defect instead of reporting an ocean
-% crossing count. Backtracking *within* a continent, which 4(b) explicitly
-% permits, disappears in the collapse and is never seen here.
+% Checking that one property catches every 4(a) and 4(b) failure at once, and
+% the message can name the actual defect instead of quoting a count of ocean
+% crossings. Backtracking *within* a continent, which 4(b) expressly allows,
+% vanishes in the collapse and is never seen here.
 
 validate:violation(A, v(tc_cycle, '4(a),4(b)', error, Msg,
                         [segments([1]), sequence(Seq), crossings(Crossings)])) :-
@@ -87,16 +87,16 @@ validate:check(A, chk(tc_cycle, '4(a),4(b)', 'Traffic-conference cycle', Detail,
 % specifically a there-and-back pair.
 
 % A backtrack is a *reversal*: one crossing of the Hawaii-mainland boundary
-% followed by the next one going the other way. So the hops are collected in
-% segment order and read as consecutive pairs, rather than every outbound being
-% matched against every inbound -- which reported the cross product, so a journey
-% that went out and back twice raised four violations instead of two, one of them
-% pairing the first arrival with a departure three crossings later that it has
-% nothing to do with.
+% followed by the next one going the other way. So the hops are gathered in
+% segment order and read as neighbouring pairs. Matching every outbound against
+% every inbound instead reported the cross product: a journey that went out and
+% back twice raised four violations rather than two, one of them pairing the
+% first arrival with a departure three crossings later that had nothing to do
+% with it.
 %
-% Both hops are carried in the evidence, in segment order and paired with the
-% segment numbers beside them: naming only one sector's airports describes half
-% of what the message says is wrong.
+% Both hops go into the evidence, in segment order, with their segment numbers
+% beside them. Naming one sector's airports would describe only half of what the
+% message says is wrong.
 validate:violation(A, v(hawaii_backtrack, '4(b)', error, Msg,
                         [segments([I, J]), pairs([PairI, PairJ])])) :-
     hawaii_hops(A, Hops),
@@ -109,21 +109,21 @@ validate:violation(A, v(hawaii_backtrack, '4(b)', error, Msg,
            [I, J]).
 
 %! hawaii_hops(+A, -Hops) is det.
-%  Every crossing of the Hawaii-mainland boundary, in segment order -- which is
-%  the order ann_seg/2 yields, so the pairs above come out with I < J without
-%  having to sort them.
+%  Every crossing of the Hawaii-mainland boundary, in segment order. That is the
+%  order ann_seg/2 gives, so the pairs above come out with I < J and need no
+%  sorting.
 hawaii_hops(A, Hops) :-
     findall(hop(N, From, To, Dir), hawaii_hop(A, N, From, To, Dir), Hops).
 
 %! sector_pair(+From, +To, -Pair) is det.
-%  Airports rather than cities: a Hawaii hop is a physical crossing, and which
+%  Airports rather than cities. A Hawaii hop is a physical crossing, and which
 %  airport it touched is the fact being reported.
 sector_pair(From, To, UF-UT) :- iata(From, UF), iata(To, UT).
 
-% Surface sectors count. 4(b) governs "travel", and 4(g) permits intermediate
+% Surface sectors count. 4(b) governs "travel", and 4(g) allows intermediate
 % surface sectors, so surfacing one leg of the pair is still going out and
-% coming back -- and HNL//SFO is exactly how the pair gets hidden from a tool
-% that only looks at flights.
+% coming back. HNL//SFO is exactly how the pair gets hidden from a tool that
+% only looks at flights.
 hawaii_hop(A, N, From, To, Direction) :-
     ann_seg(A, S),
     N = S.n, From = S.from, To = S.to,
@@ -149,8 +149,8 @@ validate:check(A, Check) :-
     ).
 
 % ---------------------------------------------------------------------------
-% 4(c): travel must terminate at the point of origin, unless the gap between
-% the finishing point and the origin is one of the seven permitted
+% 4(c): travel must end at the point of origin. The exception is when the gap
+% between the finishing point and the origin is one of the seven permitted
 % origin-destination surface relations.
 
 validate:violation(A, v(end_at_origin, '4(c)', error, Msg,
@@ -169,7 +169,7 @@ validate:violation(A, v(end_at_origin, '4(c)', error, Msg,
            [UE, UO, UE, UO]).
 
 %! permitted_od_surface(+A, +B, -Description) is nondet.
-%  The 4(c) list, direction-independent.
+%  The 4(c) list. Direction does not matter.
 permitted_od_surface(X, Y, 'within the country of origin') :-
     same_country(X, Y).
 permitted_od_surface(X, Y, 'within the Middle East') :-
@@ -216,9 +216,10 @@ validate:check(A, chk(end_at_origin, '4(c)', 'Terminates at origin', Detail, [en
 % ---------------------------------------------------------------------------
 % 4(d): travel may not be via the point of origin.
 
-% "The point of origin" is a city, so a stop at a second airport of the origin
-% city is travel via the origin. The message names that airport, because
-% otherwise it reports a revisit to an airport the itinerary never lists.
+% "The point of origin" means a city, so a stop at a second airport of the
+% origin city counts as travel via the origin. The message names that airport.
+% Without it, the report would claim a revisit to an airport the itinerary never
+% lists.
 validate:violation(A, v(origin_revisited, '4(d)', error, Msg,
                         [segments([N]), airport(U)])) :-
     Origin = A.origin,
@@ -257,13 +258,13 @@ validate:check(A, chk(origin_revisited, '4(d)', 'Origin not revisited', Detail,
 % 4(e): intercontinental departures and arrivals per continent
 % ===========================================================================
 %
-% This is a *continent*-level rule, whereas 4(b) above is a *traffic
-% conference*-level rule, and the difference is what makes legal side-trips
-% legal. TC1 is {North America, South America} and TC2 is {Europe/Middle East,
-% Africa}, so a South America excursion never leaves TC1 and an Africa
-% excursion never leaves TC2 -- neither can break the forward-direction rule.
-% What bounds them instead is the allowance below. Encoding these two rules at
-% the same level makes every legal excursion look like a violation.
+% This rule works at the *continent* level. 4(b) above works at the *traffic
+% conference* level, and that difference is what makes legal side-trips legal.
+% TC1 is {North America, South America} and TC2 is {Europe/Middle East, Africa}.
+% So a South America excursion never leaves TC1 and an Africa excursion never
+% leaves TC2, and neither can break the forward-direction rule. What limits them
+% instead is the allowance below. Encoding both rules at the same level would
+% make every legal excursion look like a violation.
 
 validate:violation(A, v(intercont_departures, '4(e)', error, Msg,
                         [continent(Cont), count(N), max(Max)])) :-
@@ -295,8 +296,8 @@ intercont_count(A, Cont, Key, N) :-
                   N).
 
 %! intercont_allowance(+A, +Continent, -Max) is det.
-%  "Two permitted in North America. Two permitted in Asia. Two permitted in
-%  Europe/Middle East for travel to/from/via Africa."
+%  The rule reads: "Two permitted in North America. Two permitted in Asia. Two
+%  permitted in Europe/Middle East for travel to/from/via Africa."
 intercont_allowance(A, Cont, Max) :-
     (   memberchk(Cont, [north_america, asia])
     ->  limit(max_intercont_relaxed, Max)
@@ -308,19 +309,19 @@ intercont_allowance(A, Cont, Max) :-
 % "If travel is to/from Europe in both directions, itinerary may not include
 % Mauritius/South Africa."
 %
-% Two words in that sentence are doing the work.
+% Two words in that sentence carry the whole rule.
 %
 % *Europe*, not Europe/Middle East. Section 0 splits this one continent into a
-% Europe zone and a Middle East zone, and the sentence two lines above this one
-% in the rule says "Europe/Middle East" in full -- so the narrower word here is
+% Europe zone and a Middle East zone, and the sentence two lines above it in the
+% rule text writes "Europe/Middle East" out in full. So the narrower word here is
 % a choice, not shorthand. A Gulf gateway is not a Europe gateway.
 %
-% *Both directions* means the two crossings of the Africa border -- the one in
-% and the one out -- and not every crossing anywhere in the itinerary. This is
-% the whole test: if either gateway is in the Middle East, the exclusion does
-% not apply. So the rule is measured on that pair, not on a count of Europe
-% arrivals, which would drag in an unrelated Asia-to-Paris sector and reject a
-% journey over something that has nothing to do with Africa.
+% *Both directions* means the two crossings of the Africa border, the one in and
+% the one out. It does not mean every crossing anywhere in the itinerary. That is
+% the whole test: if either gateway is in the Middle East, the exclusion does not
+% apply. So the rule is measured on that pair, not on a count of Europe arrivals.
+% Counting arrivals would drag in an unrelated Asia-to-Paris sector and reject a
+% journey over something with nothing to do with Africa.
 validate:violation(A, v(europe_both_ways_excluded, '4(e)', error, Msg,
                         [airport(U), country(Country), gateways(GIn-GOut)])) :-
     africa_gateway(A, into, In),
@@ -340,8 +341,8 @@ validate:violation(A, v(europe_both_ways_excluded, '4(e)', error, Msg,
 %! africa_gateway(+A, +Direction, -Airport) is semidet.
 %  The Europe/Middle East end of the sector into or out of Africa. 4(e) allows
 %  Africa one intercontinental arrival and one departure, so a legal itinerary
-%  has at most one of each; where there are more, the allowance itself has
-%  already fired and the first is enough to describe the shape.
+%  has at most one of each. Where there are more, the allowance itself has
+%  already fired, and the first one is enough to describe the shape.
 africa_gateway(A, into, Airport) :-
     ann_seg(A, S),
     S.from_cont == europe_middle_east,
@@ -355,8 +356,8 @@ africa_gateway(A, out_of, Airport) :-
     Airport = S.to,
     !.
 
-% One line per continent the itinerary actually enters or leaves. Listing all
-% six would bury the two that carry the constraint under four zeroes.
+% One line per continent the itinerary actually enters or leaves. Listing all six
+% would bury the two that carry the constraint under four zeroes.
 validate:check(A, chk(intercontinental, '4(e)', 'Intercontinental sectors', Detail,
                       [intercont_departures, intercont_arrivals,
                        europe_both_ways_excluded])) :-
@@ -418,10 +419,9 @@ intl_country_count(A, Country, Key, N) :-
 % transfer without stopover."
 %
 % The transfer has to be one of the country's own international
-% arrival-departure pairs. Accepting any US transfer anywhere would let a purely
-% domestic connection -- a change of plane at ORD in the middle of the journey
-% -- buy the second international departure, which is not what the exception
-% says.
+% arrival-departure pairs. Accepting any US transfer at all would let a purely
+% domestic connection -- a change of plane at ORD partway through the journey --
+% buy the second international departure, which is not what the exception says.
 origin_country_allowance(A, 'US', Max) :-
     origin_country_transfer(A, 'US'), !,
     limit(max_intl_dep_origin_country_usa, Max).
@@ -465,15 +465,15 @@ validate:check(A, chk(origin_country_traffic, '4(f)',
 %
 % This cap cannot be broken on its own, but it does fire. A fifth international
 % transfer in one country costs either a fifth pair of intra-continental legs,
-% which breaches 4(h)'s free-segment cap, or a third intercontinental crossing
-% on that side, which breaches 4(e) -- so one of those two always comes with
-% it. Between them they hold the reachable maximum at exactly the 4 this rule
-% permits, which is presumably why the number is 4.
+% which breaks 4(h)'s free-segment cap, or a third intercontinental crossing on
+% that side, which breaks 4(e). One of those two always comes with it. Between
+% them they hold the reachable maximum at exactly the 4 this rule allows, which
+% is presumably why the number is 4.
 %
-% Four is reachable, and gets flown: see the doh_transfers fixture, where a
-% Gulf hub takes 4(f), 4(e) and 4(h) all to their limits at once. The Africa
-% legs are intercontinental, so they cost nothing against the Europe/Middle
-% East free-segment allowance, which is what leaves room for the transfers.
+% Four is reachable, and does get flown. See the doh_transfers fixture, where a
+% Gulf hub takes 4(f), 4(e) and 4(h) to their limits all at once. The Africa
+% legs are intercontinental, so they cost nothing against the Europe/Middle East
+% free-segment allowance, and that is what leaves room for the transfers.
 validate:violation(A, v(intl_transfers_per_country, '4(f)', error, Msg,
                         [country(Country), count(N), max(Max)])) :-
     transfer_country(A, Country),
@@ -592,8 +592,8 @@ validate:violation(A, v(seg_count_max, '4(h)', error, Msg, [count(N), max(Max)])
            [N, Max, Aside]).
 
 % The gap between where the journey ends and where it began is not one of the
-% counted segments, and an itinerary at or near the limit is exactly where
-% someone will try to work out whether it was. Say so.
+% counted segments. An itinerary at or near the limit is exactly where someone
+% will wonder whether it was, so say so.
 od_gap_clause(A, Aside) :-
     (   od_surface_gap(A)
     ->  last(A.segments, Last),
@@ -672,13 +672,13 @@ free_segment_summary(A, Part) :-
 % 4(i): the same city pair may not be flown twice in the same direction
 % ===========================================================================
 %
-% Two goals and a nondeterministic search that finds every offending pair.
+% Two goals plus a nondeterministic search, which finds every offending pair.
 
 % Compared on city keys, because 4(i) is written in city pairs: LHR-JFK out and
 % LGW-JFK back is one city pair flown twice. The sector is named the way the
-% itinerary names it whenever both flights agree, and rises to the city code
-% only when they do not -- reporting "LON-NYC twice" to someone who wrote NRT
-% both times is an accusation about airports they never used.
+% itinerary names it whenever both flights agree, and only falls back to the city
+% code when they do not. Reporting "LON-NYC twice" to someone who wrote NRT both
+% times would accuse them of using airports they never touched.
 validate:violation(A, v(dup_sector, '4(i)', error, Msg,
                         [segments([I, J]), pair(UF-UT)])) :-
     ann_flight(A, I, F1, T1),
@@ -723,10 +723,10 @@ validate:check(A, chk(dup_sector, '4(i)', 'Repeated sectors', Detail,
 % 4(j): carriers, affiliates and codeshares
 % ===========================================================================
 
-% Grouped by the carrier, not reported once per segment: four sectors on one
-% ineligible airline are one thing wrong with the ticket, and four copies of
-% the same sentence bury whatever else the report has to say. Two ineligible
-% airlines stay two violations, because those are two facts.
+% Grouped by carrier rather than reported once per segment. Four sectors on one
+% ineligible airline are one thing wrong with the ticket, and four copies of the
+% same sentence bury whatever else the report has to say. Two ineligible
+% airlines stay two violations, because those are two separate facts.
 validate:violation(A, v(carrier_not_eligible, '4(j)', error, Msg,
                         [segments(Ns), carrier(U)])) :-
     ineligible_marketing(A, Mkt),
@@ -745,8 +745,8 @@ ineligible_marketing(A, Mkt) :-
     sort(Ms, Distinct),
     member(Mkt, Distinct).
 
-% Grouped by the pair, for the same reason: the marketing and operating carriers
-% together are the fact, and a codeshare flown on several sectors is one of them.
+% Grouped by the pair, for the same reason. The marketing and operating carriers
+% together are the fact, and a codeshare flown on several sectors is one fact.
 validate:violation(A, v(codeshare_not_permitted, '4(j)', error, Msg,
                         [segments(Ns), carrier(UM), operator(UO)])) :-
     bad_codeshare(A, Mkt, Op),
@@ -772,12 +772,12 @@ bad_codeshare(A, Mkt, Op) :-
     sort(Pairs, Distinct),
     member(Mkt-Op, Distinct).
 
-% Carrier eligibility cannot be decided without knowing who actually operates
-% the flight, so an absent operating carrier is a warning, not a pass.
+% Carrier eligibility cannot be settled without knowing who actually operates
+% the flight, so a missing operating carrier is a warning rather than a pass.
 %
-% Aggregated, like marketing_carrier_missing below it and for the same reason:
-% an itinerary given without operating carriers at all is one omission, not one
-% per sector.
+% These are grouped together, like marketing_carrier_missing below and for the
+% same reason. An itinerary given with no operating carriers at all is one
+% omission, not one per sector.
 validate:violation(A, v(operator_unknown, '4(j)', warning, Msg, [segments(Ns)])) :-
     findall(N, ( ann_seg(A, S), S.type == flight,
                  S.marketing \== unknown, S.operating == unknown, N = S.n ), Ns),
@@ -790,9 +790,9 @@ validate:violation(A, v(operator_unknown, '4(j)', warning, Msg, [segments(Ns)]))
            '~w ~w not state an operating carrier, so ~w codeshare eligibility under 4(j) was not checked.',
            [Where, Does, Their]).
 
-% Aggregated rather than one warning per segment: a routing given without
-% carriers at all would otherwise bury its real violations under a warning for
-% every sector, and "no carriers were given" is one fact, not sixteen.
+% Grouped rather than one warning per segment. Otherwise a routing given with no
+% carriers at all would bury its real violations under a warning for every
+% sector, and "no carriers were given" is one fact, not sixteen.
 validate:violation(A, v(marketing_carrier_missing, '4(j)', warning, Msg, [segments(Ns)])) :-
     findall(N, ( ann_seg(A, S), S.type == flight, S.marketing == unknown, N = S.n ), Ns),
     Ns \== [],
@@ -803,10 +803,10 @@ validate:violation(A, v(marketing_carrier_missing, '4(j)', warning, Msg, [segmen
            'No carrier is given for ~w, so 4(j) was not checked for ~w.', [Where, Them]).
 
 % "Ground transportation services operated by/for BA/QF may not be included as
-% part of the oneworld Explorer." A surface sector is normally the passenger's
-% own arrangement and carries no carrier at all; one that names BA or QF -- or
-% an airline operating for them -- is the coach or rail link this clause is
-% about, and it is the naming that makes it part of the ticket.
+% part of the oneworld Explorer." A surface sector is usually the passenger's own
+% arrangement and names no carrier at all. One that names BA or QF, or an airline
+% operating for them, is the coach or rail link this clause is about. Naming the
+% carrier is what makes it part of the ticket.
 validate:violation(A, v(ground_transport, '4(j)', error, Msg,
                         [segments([N]), carrier(U)])) :-
     ann_seg(A, S),
@@ -924,10 +924,10 @@ alaska_flight(A, from, N) :-
     is_alaska(S.from), \+ is_alaska(S.to),
     N = S.n.
 
-% 4(k) and 4(l) below are geography-specific, so they are declared not
-% applicable rather than passed when the itinerary never goes near them. A
-% clean pass on "transcontinental USA" for a journey that never lands in the
-% USA is a truth that reads as coverage.
+% 4(k) and 4(l) below are about particular places, so when an itinerary never
+% goes near them the rule is reported as not applicable rather than passed. A
+% clean pass on "transcontinental USA" for a journey that never lands in the USA
+% is true, but it reads as coverage.
 validate:check(A, Check) :-
     limit(max_transcontinental_us, Max),
     findall(N, transcontinental_flight(A, N), Segs),

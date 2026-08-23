@@ -11,9 +11,9 @@
 <link rel="preload" href="fonts/martianmono-latin-var.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="app.css">
 
-<!-- Inline and before the stylesheet is applied, because a stored preference that
-     disagrees with the OS would otherwise show the wrong theme for one frame.
-     This is the only script that cannot be deferred. -->
+<!-- This runs inline, before the stylesheet is applied. Otherwise a stored
+     preference that disagrees with the OS would show the wrong theme for one
+     frame. It is the only script here that cannot be deferred. -->
 <script>
   try {
     var t = localStorage.getItem('rtw-theme');
@@ -23,8 +23,8 @@
 </head>
 <body class="font-sans text-[14px] leading-[1.45]">
 
-<!-- Masthead, set like the head of a printed tariff page: the title heavily
-     condensed over a rule, the edition flush right. -->
+<!-- The masthead, set like the head of a printed tariff page: the title heavily
+     condensed over a rule, with the edition flush right. -->
 <header class="border-b-2 border-ink bg-panel">
   <div class="mx-auto flex max-w-[1680px] flex-wrap items-end justify-between gap-x-6 gap-y-1 px-4 pb-2 pt-3">
     <h1 class="text-[21px] font-extrabold uppercase leading-none tracking-[0.015em]"
@@ -48,11 +48,11 @@
   </div>
 </header>
 
-<!-- The report is the page. The form is how you address a question to it, so it
-     takes a sidebar's width and the answer takes the rest; on the Segments tab
-     the form widens to fit its table, which is the one view that needs the room.
-     Below xl the two stack, form first, because on a phone you cannot read an
-     answer to a question you have not asked yet. -->
+<!-- The report is the page. The form is how you put a question to it, so the
+     form takes a sidebar's width and the answer takes the rest. On the Segments
+     tab the form widens to fit its table, which is the one view that needs the
+     room. Below xl the two stack, form first, because on a phone you cannot read
+     an answer to a question you have not asked yet. -->
 <main id="layout"
       class="mx-auto grid max-w-[1680px] items-start gap-4 p-4 xl:grid-cols-[23rem_minmax(0,1fr)]">
 
@@ -60,9 +60,9 @@
   <section id="entry" class="min-w-0 rounded-sm border border-rule bg-panel" aria-labelledby="itinerary-heading">
     <h2 id="itinerary-heading" class="sr-only">Itinerary</h2>
 
-    <!-- Cabin, passengers and the example picker sit above the tabs because they
-         describe the fare, not the routing, and survive switching between the two
-         ways of entering a journey. -->
+    <!-- Cabin, passengers and the example picker sit above the tabs, because they
+         describe the fare rather than the routing. They survive switching between
+         the two ways of entering a journey. -->
     <div class="flex flex-wrap items-end gap-x-4 gap-y-3 border-b border-rule px-4 py-3">
       <div class="min-w-[15rem] flex-1">
         <label class="label mb-1 block" for="example">Load an example</label>
@@ -89,8 +89,8 @@
       </div>
     </div>
 
-    <!-- The two ways in. Each posts a different request shape, so neither view has
-         to pretend to be the other. -->
+    <!-- The two ways in. Each one posts a different request shape, so neither
+         view has to pretend to be the other. -->
     <div class="flex items-stretch border-b border-rule px-4" role="tablist"
          aria-label="How to enter the itinerary">
       <button type="button" role="tab" id="tab-routing" aria-controls="panel-routing"
@@ -112,11 +112,11 @@
     <!-- ---------------------------- routing ---------------------------- -->
     <div id="panel-routing" role="tabpanel" aria-labelledby="tab-routing" class="px-4 py-3">
       <label class="label mb-1 block" for="route">Fare-construction routing</label>
-      <!-- A textarea rather than an input because a routing is longer than the
+      <!-- A textarea rather than an input, because a routing is longer than the
            column it now sits in, and a field that scrolls sideways hides most of
            what you typed. The grammar already separates on whitespace, so a
            wrapped routing parses exactly as a single line does. Enter still
-           validates; Shift+Enter is the way to insert a break. -->
+           validates, and Shift+Enter inserts a break. -->
       <div class="flex flex-wrap gap-2">
         <textarea id="route" rows="2" class="route-input w-full resize-y"
                   spellcheck="false" autocomplete="off" wrap="soft"
@@ -124,8 +124,9 @@
         <button id="parse" class="btn">Validate routing</button>
       </div>
       <p class="hint mt-2 max-w-[68ch] text-[12px] leading-[1.6] text-muted" id="routehelp"></p>
-      <!-- Reference material, not instruction. It was five lines sitting under the
-           primary input competing with it; it belongs one click away. -->
+      <!-- Reference material rather than instruction. It used to be five lines
+           sitting under the main input and competing with it. It belongs one
+           click away. -->
       <details class="group mt-1.5">
         <summary class="label cursor-pointer select-none">
           <span class="mono inline-block w-3 transition-transform duration-150 group-open:rotate-90">&rsaquo;</span>
@@ -142,10 +143,11 @@
         Written from the segment table. Dates, times and flight numbers have no
         notation in a routing, so they are not carried across.
       </p>
-      <!-- Why the segment table could not be written out as a routing. Composed
-           by the server, not here: a routing written in the browser would be a
-           second definition of the grammar with no test behind it — so the
-           reason it could not be written is the server's to give too. -->
+      <!-- Why the segment table could not be written out as a routing. The
+           message comes from the server, not from here. A routing written in the
+           browser would be a second definition of the grammar with no test
+           behind it, so the reason one could not be written is the server's to
+           give as well. -->
       <p id="routingerr" class="hidden mt-2 max-w-[68ch] text-[12.5px] text-warn"></p>
     </div>
 
@@ -154,8 +156,9 @@
       <div class="mb-3 flex flex-wrap items-end gap-x-4 gap-y-3">
         <div>
           <label class="label mb-1 block" for="times">Times</label>
-          <!-- Not called "routing only": the sibling tab is already called Routing
-               and means something narrower. This is about whether a clock exists. -->
+          <!-- Not called "routing only". The sibling tab is already called
+               Routing and means something narrower. This control is about
+               whether there is a clock at all. -->
           <select id="times" class="field-select w-[13.5rem]">
             <option value="full">Dates and times given</option>
             <option value="routing">No dates or times</option>
@@ -175,26 +178,27 @@
               <th class="label pb-1.5 pr-2 text-left">Type</th>
               <th class="label pb-1.5 pr-2 text-left">From</th>
               <th class="label pb-1.5 pr-2 text-left">To</th>
-              <!-- Next to "To" rather than at the far end: it describes the point
-                   the segment arrives at, and it is the one control routing-only
-                   itineraries turn on, so it must not be what scrolls out of
-                   sight when the time columns are shown. -->
+              <!-- Next to "To" rather than at the far end. It describes the point
+                   the segment arrives at, and it is the one control a
+                   routing-only itinerary turns on, so it must not be the thing
+                   that scrolls out of sight when the time columns are shown. -->
               <th class="label pb-1.5 pr-2 text-left">Stop at arrival</th>
               <!-- Thirteen columns is what forces the abbreviations, and an
-                   abbreviation the reader has to guess at is worse than the
-                   column being narrow. Each one carries its expansion; see
-                   .abbr in app.src.css for why it is not a `title`. Which
-                   carrier is which is the whole reason there are two columns,
-                   so both say what they distinguish and not just what they
+                   abbreviation the reader has to guess at is worse than a narrow
+                   column. So each one carries what it stands for; see .abbr in
+                   app.src.css for why that is not a `title`. Telling the two
+                   carriers apart is the whole reason there are two columns, so
+                   both say what makes them different, not just what the letters
                    stand for. -->
               <th class="label pb-1.5 pr-2 text-left"><span class="abbr"
                   data-title="Marketing carrier — whose code is on the ticket">Mkt</span></th>
               <th class="label pb-1.5 pr-2 text-left"><span class="abbr"
                   data-title="Operating carrier — whose aircraft flies it">Op</span></th>
               <th class="label pb-1.5 pr-2 text-left">Flight</th>
-              <!-- The class is what section 5(b) is written in and what every
-                   earning table is read against; the fare family is what one of
-                   them cannot price a sector without. Neither is required. -->
+              <!-- The class is what section 5(b) is written in, and what every
+                   earning table is read against. The fare family is what one of
+                   those tables cannot price a sector without. Neither is
+                   required. -->
               <th class="label pb-1.5 pr-2 text-left"><span class="abbr"
                   data-title="Booking class — the single-letter RBD">Cls</span></th>
               <th class="label c-fare pb-1.5 pr-2 text-left"><span class="abbr"
@@ -215,25 +219,26 @@
 
       <!-- Why the routing in the other tab could not be turned into rows. It
            sits here because this is the tab the reader is looking at when the
-           conversion runs, and the one with nothing in it to explain. -->
+           conversion runs, and the one left with nothing in it to explain. -->
       <p id="segerr" class="hidden mt-3 max-w-[68ch] text-[12.5px] text-warn"></p>
 
       <div class="mt-3 flex flex-wrap items-center gap-2">
         <!-- "Show as routing" used to live here. Opening the Routing tab now
-             writes the table out as a routing on its own, which is what the tab
-             was always for; the button asked the reader to know the two tabs
-             might be showing different itineraries and to remember to say so. -->
+             writes the table out as a routing by itself, which is what that tab
+             was always for. The button asked the reader to notice that the two
+             tabs might be showing different itineraries, and then to remember to
+             say so. -->
         <button id="add" class="btn-quiet">Add segment</button>
         <button id="clear" class="btn-quiet">Clear</button>
-        <!-- Clear discards a table that may have taken real typing. Undo costs one
-             variable and removes the need for a confirmation dialog. -->
+        <!-- Clear throws away a table that may have taken real typing. Undo costs
+             one variable and removes the need for a confirmation dialog. -->
         <button id="undo" class="btn-quiet hidden">Undo clear</button>
         <button id="validate" class="btn ml-auto">Validate segments</button>
       </div>
     </div>
 
-    <!-- Escape hatch for anyone driving the API directly. Collapsed: it is not part
-         of the normal path through the page. -->
+    <!-- An escape hatch for anyone driving the API directly. It is collapsed,
+         because it is not part of the normal path through the page. -->
     <details class="group border-t border-rule px-4 py-2.5">
       <summary class="label cursor-pointer select-none list-none marker:content-none">
         <span class="mono inline-block w-3 transition-transform duration-150 group-open:rotate-90">&rsaquo;</span>
@@ -247,26 +252,26 @@
   </section>
 
   <!-- ============================ report ============================ -->
-  <!-- Two sub-columns on a wide screen, one below it. The verdict and the rules
-       are what the page is for and go first; earning is a different question and
-       goes beside rather than under, where it costs the reader no scrolling to
-       reach and none to skip. -->
+  <!-- Two sub-columns on a wide screen, one below the other otherwise. The
+       verdict and the rules are what the page is for, so they go first. Earning
+       is a different question, so it goes beside them rather than under, where
+       it costs the reader no scrolling to reach and none to skip. -->
   <section id="answer" class="min-w-0 xl:sticky xl:top-4" aria-labelledby="report-heading">
-    <!-- The heading was a strip of chrome above the panel saying "Report" over
-         something that says INVALID in 34px. It still exists for anyone
-         navigating by headings; it just does not take a row of the layout. -->
+    <!-- The heading used to be a strip of chrome above the panel, saying "Report"
+         over something that says INVALID in 34px. It still exists for anyone
+         navigating by headings. It just no longer takes a row of the layout. -->
     <h2 id="report-heading" class="sr-only">Report</h2>
 
-    <!-- scroll-mt-4 is for revealReport(): scrolled hard against the top edge the
-         verdict reads as cropped, and it matches the xl:top-4 the panel already
-         sticks at. -->
+    <!-- scroll-mt-4 is for revealReport(). Scrolled hard against the top edge,
+         the verdict reads as cropped. It also matches the xl:top-4 the panel
+         already sticks at. -->
     <div id="report-panel" class="relative min-w-0 scroll-mt-4 rounded-sm border border-rule bg-panel">
       <div id="report"></div>
 
-      <!-- Both float over the top-right of the verdict band rather than sitting
-           above the panel, so neither costs vertical space. They carry their own
-           background because whatever is behind them is a different colour for
-           each verdict. -->
+      <!-- Both float over the top right of the verdict band rather than sitting
+           above the panel, so neither costs any vertical space. They carry their
+           own background, because whatever is behind them is a different colour
+           for each verdict. -->
       <div class="pointer-events-none absolute right-2.5 top-2.5 flex items-center gap-2">
         <p id="stale" class="hidden rounded-xs bg-panel/90 px-1.5 py-0.5 text-[11px] font-semibold text-warn">
           Itinerary changed
@@ -276,54 +281,55 @@
     </div>
 
     <!-- A second panel rather than a section of the report, because earning is a
-         different question: it runs no fare rules, an itinerary that cannot be
-         sold can still be priced for what it would earn, and one that is
-         perfectly valid can be unpriceable. Hidden until the first validation.
-         It is the whole of the second column: the connections table used to sit
-         under it in a panel of its own and now lives in the report, beside the
-         verdict it is evidence for. -->
+         different question. It runs no fare rules: an itinerary that cannot be
+         sold can still be priced for what it would earn, and a perfectly valid
+         one can be unpriceable. It is hidden until the first validation. It is
+         also the whole of the second column now. The connections table used to
+         sit under it in a panel of its own, and now lives in the report, beside
+         the verdict it is evidence for. -->
     <div id="earn-panel" class="hidden min-w-0 rounded-sm border border-rule bg-panel">
       <div class="border-b border-rule px-4 py-2">
         <h2 class="label">Earning</h2>
       </div>
       <!-- One expandable section per programme, filled from the validator's own
            list, so the page names no programme, no currency, no fare family and
-           no tier of its own -- the same reason it hardcodes no rule. Every
-           programme is always priced and always shows its totals; the section
-           holds the detail behind them, and a membership tier sits inside the
-           programme it belongs to rather than in a row of controls above. -->
+           no tier of its own. That is the same reason it hardcodes no rule.
+           Every programme is always priced and always shows its totals. The
+           section holds the detail behind them, and a membership tier sits
+           inside the programme it belongs to rather than in a row of controls
+           above. -->
       <div id="earn"></div>
     </div>
 
-    <!-- The report is replaced wholesale on every validation, which a screen
-         reader has no reason to notice. One short line goes here instead of
-         making the whole panel a live region, which would read the fare table
-         and every connection aloud on each press. -->
+    <!-- The whole report is replaced on every validation, and a screen reader has
+         no reason to notice that. So one short line goes here instead of making
+         the whole panel a live region, which would read the fare table and every
+         connection aloud on each press. -->
     <p id="announce" class="sr-only" role="status" aria-live="polite"></p>
   </section>
 </main>
 
 <!-- Validating scrolls the answer into view, which leaves the form above the top
-     of the window. This is the return trip. It is hidden until the form is
-     entirely off screen -- see revealReport()'s neighbour in app.js -- so on a
-     wide screen, where the form is a sidebar beside the answer, it never shows.
-     The arrow is decorative: the words already say where it goes. -->
+     of the window. This button is the return trip. It stays hidden until the
+     form is entirely off screen -- see revealReport()'s neighbour in app.js --
+     so on a wide screen, where the form is a sidebar beside the answer, it never
+     appears. The arrow is decorative; the words already say where it goes. -->
 <button type="button" id="totop" class="to-top" hidden>
   <span aria-hidden="true" class="mono text-[11px]">&uarr;</span>
   <span id="totop-label">Back to the routing</span>
 </button>
 
 <!-- ============================ help ============================ -->
-<!-- A native <dialog> opened with showModal(), which is the whole reason this is
-     one element and no focus-trap code: the browser makes the rest of the page
+<!-- A native <dialog> opened with showModal(). That is the whole reason this is
+     one element with no focus-trap code: the browser makes the rest of the page
      inert, sends Escape here, restores focus to the button on close, and gives
-     ::backdrop to style. Nothing else on this page is a modal, and this is the
-     one thing that has no place in the reading order -- it explains the page
-     rather than being part of it.
+     us ::backdrop to style. Nothing else on this page is a modal, and this is
+     the one thing with no place in the reading order, because it explains the
+     page rather than being part of it.
 
-     Every figure in it is a slot. The prose is about what the fare is, which is
-     the page's to say; the numbers are the ruleset's, and the page holds no
-     second copy of any of them for the same reason it hardcodes no rule. -->
+     Every figure in it is a slot. The prose says what the fare is, which is the
+     page's to say. The numbers belong to the ruleset, and the page holds no
+     second copy of any of them, for the same reason it hardcodes no rule. -->
 <dialog id="help" class="help-dialog" aria-labelledby="help-title">
   <div class="flex shrink-0 items-start justify-between gap-4 border-b border-rule px-5 py-3">
     <div>
@@ -359,8 +365,8 @@
 
     <section>
       <h3 class="label mb-1.5">What the rule requires</h3>
-      <!-- Built from the ruleset the validator reports. Until it answers, this
-           says so rather than showing numbers the page invented. -->
+      <!-- Built from the ruleset the validator reports. Until the validator
+           answers, this says so rather than showing numbers the page made up. -->
       <dl id="help-limits" class="grid gap-x-6 gap-y-1.5 text-[12.5px] sm:grid-cols-2">
         <p class="text-muted">Reading the ruleset…</p>
       </dl>
@@ -439,16 +445,17 @@
   </div>
 </dialog>
 
-<!-- Every path on this page is relative. GitHub Pages serves a project repository
-     from /<repo>/ rather than from the root, and an absolute path that works
-     behind the service would 404 there. They resolve identically either way.
+<!-- Every path on this page is relative. GitHub Pages serves a project
+     repository from /<repo>/ rather than from the root, and an absolute path
+     that works behind the service would 404 there. Relative paths resolve the
+     same way either way.
 
-     map.js is loaded before app.js because the report renderer calls into it
-     synchronously. It is the bulkier of the two -- most of it is the Natural
-     Earth land outline -- so it is deferred rather than blocking the first paint
-     of the form. api.js starts the worker that carries the validator itself; it
-     precedes app.js, which calls it as soon as it runs. `defer` keeps them in
-     the order they appear. -->
+     map.js loads before app.js, because the report renderer calls into it
+     synchronously. It is the bigger of the two -- most of it is the Natural
+     Earth land outline -- so it is deferred rather than left to block the first
+     paint of the form. api.js starts the worker that carries the validator
+     itself, and it comes before app.js, which calls it as soon as it runs.
+     `defer` keeps them in the order they appear. -->
 <script defer src="map.js"></script>
 <script defer src="api.js"></script>
 <script defer src="app.js"></script>

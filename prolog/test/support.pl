@@ -6,9 +6,9 @@
 /** <module> Shared fixture loading for the plunit suites.
 */
 
-% SWI 10 moved JSON out of the HTTP package: `library(json)` does not exist on
+% SWI 10 moved JSON out of the HTTP package. `library(json)` does not exist on
 % 9.x, and `library(http/json)` prints a deprecation notice on 10.x. Asking
-% which one is present is the only spelling that is silent on both.
+% which one is present is the only way to stay quiet on both.
 :- if(exists_source(library(json))).
 :- use_module(library(json)).
 :- else.
@@ -40,7 +40,7 @@ fixture_report(Name, Verdict, Report) :-
 %! fixture_rules(+Name, -Verdict-RuleIds) is det.
 %  The sorted set of rule ids that fired. Mutation tests assert on this set
 %  rather than on the violation count, so a rule that fires twice for the same
-%  reason still reads as one rule having fired.
+%  reason still counts as one rule having fired.
 fixture_rules(Name, Verdict-Ids) :-
     fixture_report(Name, Verdict, report(_, Violations, _, _, _)),
     rule_ids(Violations, Ids).
@@ -62,7 +62,7 @@ fixture_check(Name, Id, check(Id, Citation, Label, Outcome, Detail)) :-
     memberchk(check(Id, Citation, Label, Outcome, Detail), Checks).
 
 %! fixture_names(-Names) is det.
-%  Every fixture on disk, so a coverage test cannot go stale by forgetting one.
+%  Every fixture on disk, so a coverage test cannot go stale by missing one.
 fixture_names(Names) :-
     module_property(test_support, file(Here)),
     file_directory_name(Here, Dir),

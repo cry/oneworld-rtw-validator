@@ -5,9 +5,9 @@
 %
 % Source: https://davidmegginson.github.io/ourairports-data/airports.csv
 %
-% The output is committed to git. Regenerating is a manual step so that a
-% change in upstream geography arrives as a reviewable diff rather than as a
-% silent behaviour change, and so a fresh clone runs offline.
+% The output is committed to git. Regenerating is a manual step, so a change in
+% upstream geography arrives as a reviewable diff rather than as a silent change
+% in behaviour, and so a fresh clone runs offline.
 
 :- module(build_airports, [main/0, build/2]).
 
@@ -48,8 +48,8 @@ build(In, Out) :-
 %   7 elevation_ft  8 continent  9 iso_country  10 iso_region
 %   11 municipality  12 scheduled_service  13 icao_code  14 iata_code ...
 %
-% Column 8 (`continent`) is deliberately NOT read: it is physical geography and
-% disagrees with the fare rule's continents. See data/countries.pl.
+% Column 8 (`continent`) is NOT read, on purpose. It holds physical geography,
+% which disagrees with the fare rule's continents. See data/countries.pl.
 airport_key(In, k(Iata, Rank, Country, Region, City, Lat, Lon)) :-
     csv_read_file_row(In, Row, [functor(row), arity(19), convert(false), line(Line)]),
     Line > 1,
@@ -67,10 +67,11 @@ airport_key(In, k(Iata, Rank, Country, Region, City, Lat, Lon)) :-
     number_or(Lat0, 0.0, Lat),
     number_or(Lon0, 0.0, Lon).
 
-% Everything with scheduled service and an IATA code is kept, including
-% small_airport: filtering by size drops real scheduled points (Broome and
-% Karratha are in the 4(l) city-pair table, and Karratha is only "medium").
-% Rank exists solely to pick a winner when two rows share an IATA code.
+% Everything with scheduled service and an IATA code is kept, small_airport
+% included. Filtering by size drops real scheduled points: Broome and Karratha
+% are both in the 4(l) city-pair table, and Karratha is only "medium". Rank
+% exists for one job only, which is picking a winner when two rows share an IATA
+% code.
 type_rank(T0, Rank) :-
     text_atom(T0, T),
     (   T == large_airport  -> Rank = 1
@@ -88,22 +89,24 @@ number_or(X, Default, N) :-
     text_atom(X, A),
     (   atom_number(A, N0) -> N = N0 ; N = Default ).
 
-% The keys arrive from sort/2 ordered by IATA and then by type rank, so every
-% row sharing a code is already adjacent and the first of the run is the winner.
-% Dropping the rest of the run is therefore one pass over the list.
+% sort/2 hands the keys over ordered by IATA and then by type rank. Every row
+% sharing a code is therefore already next to its neighbours, and the first of
+% the run is the winner. Dropping the rest of the run takes one pass over the
+% list.
 %
-% This used to be an exclude/3 over the whole tail with the lambda
-% [k(I,...)]>>(I == Iata), which quietly excluded nothing: >>/2 copies its lambda
-% before each call, and Iata -- a free variable of the body rather than a
-% parameter -- was renamed with it, so the comparison was always against a fresh
-% unbound variable. Declaring it as {Iata}/[k(I,...)]>>(I == Iata) would have
-% fixed the copy, but the run is adjacent and the scan is not needed at all.
+% This used to be an exclude/3 over the whole tail, with the lambda
+% [k(I,...)]>>(I == Iata), and it quietly excluded nothing. >>/2 copies its
+% lambda before each call, and Iata was a free variable of the body rather than
+% a parameter, so it was renamed along with the copy. The comparison was always
+% against a fresh unbound variable. Writing it as {Iata}/[k(I,...)]>>(I == Iata)
+% would have fixed the copy, but the run is adjacent and the scan is not needed
+% at all.
 %
-% Nothing downstream noticed because the current CSV happens to give each IATA
-% code one scheduled-service row. Had it not, the generated file would have
-% carried two airport/6 facts for one code, and every geo lookup built on
-% first-argument indexing -- airport_country/2 and the rest -- would have become
-% nondeterministic and answered with whichever row came first.
+% Nothing downstream noticed, because the current CSV happens to give each IATA
+% code exactly one scheduled-service row. Had it not, the generated file would
+% have carried two airport/6 facts for one code. Every geo lookup that relies on
+% first-argument indexing -- airport_country/2 and the rest -- would then have
+% become nondeterministic, answering with whichever row came first.
 dedupe_by_iata([], []).
 dedupe_by_iata([K|Ks], [K|Rest]) :-
     K = k(Iata, _, _, _, _, _, _),
@@ -126,9 +129,9 @@ write_file(S, Keys, N) :-
     format(S, "% Urals, Hawaii and Alaska, the 4(k) transcontinental columns). Coordinates~n", []),
     format(S, "% are carried for the Urals split and for route drawing in the web UI.~n~n", []),
     % Several hundred city names are non-ASCII, and SWI reads source files in
-    % the locale encoding unless told otherwise. Without this a container or a
-    % cron job running under LC_ALL=C loads the table mojibaked and serves it
-    % that way, which is worse than failing.
+    % the locale encoding unless told otherwise. Without this line, a container
+    % or a cron job running under LC_ALL=C loads the table mojibaked and serves
+    % it that way, which is worse than failing outright.
     format(S, "% Several hundred city names below are non-ASCII, so the encoding is~n", []),
     format(S, "% declared rather than left to the locale of whoever loads the file.~n", []),
     format(S, ":- encoding(utf8).~n~n", []),

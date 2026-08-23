@@ -7,9 +7,9 @@
 
 /** <module> Section 0 fare basis and section 12 surcharges.
 
-    Informational output rather than validation, with one exception: fewer
-    than three continents has no published fare basis at all, which is why
-    rules/r00_continents.pl raises it as an error.
+    This is information for the reader rather than validation, with one
+    exception. Fewer than three continents has no published fare basis at all,
+    which is why rules/r00_continents.pl raises it as an error.
 */
 
 :- use_module(geo).
@@ -38,7 +38,7 @@ fare(A, fare{ continents: N,
 %  Section 0: "Travel between South West Pacific and Europe/Middle East on a
 %  single flight number or by surface ... is considered travelling via Asia.
 %  Continents South West Pacific, Asia and Europe/Middle East must each be
-%  counted." So a nonstop LON-PER adds Asia to the count even though the
+%  counted." So a nonstop LON-PER adds Asia to the count, even though the
 %  itinerary never touches an Asian airport.
 continent_count(A, Continents, N) :-
     exclude(==(unknown), A.visited, Base),
@@ -49,32 +49,33 @@ continent_count(A, Continents, N) :-
     length(Continents, N).
 
 %! via_asia_sector(+A, -SegmentNumber) is nondet.
-%  A single segment, flight or surface, joining the South West Pacific
-%  directly to Europe/Middle East.
+%  One segment, flight or surface, that joins the South West Pacific straight to
+%  Europe/Middle East.
 %
-%  This feeds the continent count and nothing else. It deliberately does not
-%  feed 4(e), even though "considered travelling via Asia" could be read as
-%  putting an arrival into Asia and a departure from it on the itinerary, and
-%  some experienced bookers do read it that way.
+%  This feeds the continent count and nothing else. It stays out of 4(e) on
+%  purpose, even though "considered travelling via Asia" could be read as adding
+%  an arrival into Asia and a departure from it to the itinerary. Some
+%  experienced bookers do read it that way.
 %
-%  Two things hold it here. The sentence sits in section 0 under how the fare
-%  is determined, and what it says must be counted is continents -- the input
-%  to the fare basis, which is the paragraph above it. And the reading is
-%  nearly inert: the deemed pair would consume one of Asia's two allowed
-%  arrivals and one of its two departures, so it only ever bites an itinerary
-%  that already enters Asia twice by air *and* flies a nonstop between the
-%  South West Pacific and Europe. A traveller who has flown LON-SYD through
-%  and never met an Asia problem is what that predicts, and the one itinerary
-%  on record of the biting shape is already invalid five other ways -- so
-%  adopting it would have changed no verdict anyone has produced, while
-%  putting a new way to fail in front of journeys that price today.
+%  Two things keep it here. First, the sentence sits in section 0, under how the
+%  fare is determined, and what it says must be counted is continents -- the
+%  input to the fare basis, which is the paragraph just above it. Second, the
+%  other reading barely does anything. The implied pair would use up one of
+%  Asia's two allowed arrivals and one of its two departures, so it only ever
+%  bites an itinerary that already enters Asia twice by air *and* flies a nonstop
+%  between the South West Pacific and Europe. That predicts a traveller who has
+%  flown LON-SYD through and never hit an Asia problem, which is what we see. The
+%  one itinerary on record of the biting shape is already invalid five other
+%  ways. Adopting the other reading would therefore have changed no verdict
+%  anyone has produced, while adding a new way to fail for journeys that price
+%  today.
 via_asia_sector(A, N) :-
     ann_seg(A, S),
     sort([S.from_cont, S.to_cont], [europe_middle_east, south_west_pacific]),
     N = S.n.
 
 %! premium_economy_rows(+A, -Rows) is det.
-%  Section 12 charges are per flight segment; surface sectors carry none.
+%  Section 12 charges apply per flight segment. Surface sectors carry none.
 premium_economy_rows(A, Rows) :-
     findall(row{ segment: N, from: From, to: To,
                  from_region: RF, to_region: RT, usd: Usd },
@@ -88,9 +89,9 @@ premium_economy_rows(A, Rows) :-
             Rows).
 
 %! discounts(+A, -Rows) is det.
-%  Rule 19. Unaccompanied children are not accepted at all, and an infant
-%  turning two mid-journey must hold a full child fare; both are stated in the
-%  message rather than computed.
+%  Rule 19. Unaccompanied children are not accepted at all, and an infant who
+%  turns two mid-journey must hold a full child fare. Both facts are stated in
+%  the message rather than worked out here.
 discounts(A, Rows) :-
     findall(row{ type: T, percent: P, fare_code_suffix: Suffix },
             ( member(Pax, A.passengers),

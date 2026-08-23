@@ -199,7 +199,7 @@ cx_row(zh, economy, economy, g, all).
 cx_row(zh, economy, economy, h, all).
 
 %! cx_class(?Airline, ?Cabin, ?Brand, ?Group, ?Scope, ?Class) is nondet.
-%  A faithful transcription: a class appears once per card that lists it.
+%  A faithful transcription, so a class appears once per card that lists it.
 cx_class(cx, first, first, a, all, f).
 cx_class(cx, first, first, a, all, a).
 cx_class(cx, business, business, b, all, j).
@@ -715,8 +715,9 @@ cx_class(zh, economy, economy, h, all, l).
 cx_class(zh, economy, economy, h, all, p).
 
 %! cx_group_label(?Airline, ?Cabin, ?Group, ?Scope, ?Label) is nondet.
-%  The fare group's membership as the table writes it, so a figure can be checked
-%  against the published row rather than against a key this file invented.
+%  The fare group's membership, written the way the table writes it, so a figure
+%  can be checked against the published row rather than against a key this file
+%  invented.
 cx_group_label(cx, first, a, all, 'F A').
 cx_group_label(cx, business, b, all, 'J C').
 cx_group_label(cx, business, c, all, 'D P I').
@@ -884,23 +885,23 @@ cx_cabin_label(first,           'First').
 
 %! cx_family(?Family, ?Brand) is nondet.
 %  What a caller may put in `fareFamily`, and the card it names. Codeshare is
-%  deliberately not one of them: it is settled by who operates the flight rather
-%  than by what was bought.
+%  left out on purpose, because who operates the flight settles it rather than
+%  what was bought.
 cx_family(flex, economy_flex).
 cx_family(essential, economy_essential).
 cx_family(light, economy_light).
 
 %! cx_codeshare_brand(?Cabin, ?Brand) is nondet.
 %  The card a Cathay flight number on partner metal reads against. Economy has
-%  one and it is numerically identical to Economy Light in every band; the other
-%  three cabins publish none, so a codeshare in them is unknown rather than
-%  priced off the Cathay-operated figure.
+%  one, and it matches Economy Light exactly in every band. The other three cabins
+%  publish none, so a codeshare in them comes back unknown rather than priced off
+%  the Cathay-operated figure.
 cx_codeshare_brand(economy, codeshare).
 
 %! cx_class_settled(?Class, ?Brand, ?Reason) is nondet.
-%  The one place a fact that is not on the page decides an answer. Y is full-fare
-%  economy and therefore the flexible fare whatever the grid lists it under; B, H
-%  and K are not, and stay a range until a fareFamily says which they were.
-%  src/earn/cx.pl reports this reason as the basis rather than claiming the table
+%  The one place where a fact that is not on the page decides an answer. Y is
+%  full-fare economy, so it is the flexible fare whatever the grid lists it under.
+%  B, H and K are not, and stay a range until a fareFamily says which they were.
+%  src/earn/cx.pl reports this reason as the basis, rather than claiming the table
 %  settled it.
 cx_class_settled(y, economy_flex, 'Y is full-fare economy, which is sold as the flexible fare').

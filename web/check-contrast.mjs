@@ -1,15 +1,16 @@
 // Contrast check over the palette in app.src.css. Run with `npm run check:contrast`.
 //
-// The tokens are duplicated here rather than parsed out of the CSS, which is a real
-// cost: in app.src.css each colour is one light-dark(light, dark) pair, and both
-// halves also appear in the two tables below. It buys a check that runs without a
-// browser, a build, or a CSS parser, and the duplication fails loudly -- a token
-// edited in one place and not the other shows up as a ratio that moved for no
-// reason. Values are OKLCH [L, C, H], converted to sRGB and scored by WCAG 2.2.
+// The tokens are copied here rather than parsed out of the CSS, and that costs
+// something real: in app.src.css each colour is one light-dark(light, dark) pair,
+// and both halves appear again in the two tables below. What it buys is a check
+// that runs with no browser, no build and no CSS parser. The duplication also
+// fails loudly, because a token edited in one place and not the other shows up as
+// a ratio that moved for no reason. Values are OKLCH [L, C, H], converted to sRGB
+// and scored by WCAG 2.2.
 //
-// Targets: 4.5:1 for text (1.4.3), 3:1 for the boundary of a control and for the
-// focus ring (1.4.11). Row hairlines are decorative and only checked for being
-// visible at all.
+// The targets are 4.5:1 for text (1.4.3), and 3:1 for the boundary of a control
+// and for the focus ring (1.4.11). Row hairlines are decorative, so they are only
+// checked for being visible at all.
 const oklch2srgb = (L, C, H) => {
   const h = H * Math.PI / 180, a = C * Math.cos(h), b = C * Math.sin(h);
   const l_ = L + 0.3963377774*a + 0.2158037573*b;

@@ -3,7 +3,8 @@
 /** <module> Geography units.
 
     The fare rule's continents are not physical geography, and the OurAirports
-    `continent` column is. These tests pin every place the two disagree.
+    `continent` column is. These tests pin down every place where the two
+    disagree.
 */
 
 :- use_module(library(plunit)).
@@ -40,8 +41,8 @@ test(tashkent_is_asia) :-
     airport_continent(tas, asia).
 
 % The CSV files Honolulu under Oceania. 4(b) speaks of "backtracking between
-% Hawaii and other points in North America", so the fare rule needs it in
-% North America -- flagged, but not moved out of the continent.
+% Hawaii and other points in North America", so the fare rule needs it in North
+% America. It is flagged, but never moved out of the continent.
 test(honolulu_is_north_america_and_flagged) :-
     airport_continent(hnl, north_america),
     is_hawaii(hnl).
@@ -50,8 +51,8 @@ test(anchorage_is_alaska) :-
     is_alaska(anc),
     airport_continent(anc, north_america).
 
-% The CSV's own continent column files Astrakhan and Grozny, both west of the
-% Urals, as Asia; longitude gets them right.
+% The CSV's own continent column files Astrakhan and Grozny as Asia, though both
+% are west of the Urals. Longitude gets them right.
 test(russia_splits_at_the_urals) :-
     airport_continent(led, europe_middle_east),   % St Petersburg
     airport_continent(asf, europe_middle_east),   % Astrakhan
@@ -91,14 +92,14 @@ test(section_12_regions) :-
     airport_fare_region(nrt, japan_korea),
     airport_fare_region(doh, middle_east).
 
-% Every airport in the generated table must resolve to a fare-rule continent;
-% an unmapped country would silently make segments look intra-continental.
+% Every airport in the generated table must resolve to a fare-rule continent. An
+% unmapped country would quietly make segments look intra-continental.
 %
-% And to a traffic conference, which is a separate claim: airports.pl is
-% regenerated from upstream while countries.pl is maintained by hand, so a
-% country appearing upstream and not here is the way this breaks. 4(a)/4(b) is
-% checked entirely on the traffic-conference sequence, so that is the assertion
-% the routing rules actually rest on.
+% It must resolve to a traffic conference too, which is a separate claim.
+% airports.pl is regenerated from upstream while countries.pl is maintained by
+% hand, so the way this breaks is a country appearing upstream and not here.
+% 4(a) and 4(b) are checked entirely on the traffic-conference sequence, so that
+% is the assertion the routing rules actually rest on.
 test(every_airport_resolves) :-
     findall(A, ( airport(A, _, _, _, _, _), \+ airport_continent(A, _) ), Placeless),
     assertion(Placeless == []),
@@ -106,13 +107,14 @@ test(every_airport_resolves) :-
     assertion(Unassigned == []).
 
 % One row per code. The whole geography rests on airport/6 being a function of
-% its first argument -- airport_country/2 and its siblings are single-goal
-% lookups that take the first answer -- so a second row for one code would make
-% every one of them quietly nondeterministic and dependent on file order.
-% build_airports.pl is what enforces this, and it enforced nothing for a while:
-% its deduplication was an exclude/3 whose lambda compared against a variable
-% yall had renamed out from under it, so it excluded nothing and the table was
-% clean only because the upstream CSV happened to be.
+% its first argument: airport_country/2 and its siblings are single-goal lookups
+% that take the first answer. A second row for one code would make every one of
+% them quietly nondeterministic and dependent on file order.
+%
+% build_airports.pl is what enforces this, and for a while it enforced nothing.
+% Its deduplication was an exclude/3 whose lambda compared against a variable
+% yall had renamed out from under it, so it excluded nothing. The table was clean
+% only because the upstream CSV happened to be.
 test(each_iata_code_has_exactly_one_row) :-
     findall(A, airport(A, _, _, _, _, _), All),
     msort(All, Sorted),
@@ -127,29 +129,29 @@ test(each_iata_code_has_exactly_one_row) :-
         assertion(Repeated == [])
     ).
 
-% ...and if one ever does slip through, the report must degrade rather than lose
-% a line. Rendering a sequence is what 4(a)/4(b)'s check does with it, and a
-% partial name table used to make that maplist fail and take the whole check
-% clause out of the register without saying anything.
+% ...and if one ever does slip through, the report must cope rather than lose a
+% line. 4(a) and 4(b)'s check renders a sequence, and a partial name table used
+% to make that maplist fail, taking the whole check clause out of the register
+% without a word.
 test(the_name_tables_are_total_over_what_annotate_can_produce) :-
     forall(( airport(A, _, _, _, _, _), airport_continent(A, Cont) ),
            continent_name(Cont, _)),
     forall(( airport(A, _, _, _, _, _), airport_tc(A, TC) ), tc_name(TC, _)),
     assertion(continent_name(unknown, _)),
     assertion(tc_name(unknown, _)),
-    % The fallback must stay out of the list the rules iterate, or every
-    % per-continent cap gains a seventh continent that no itinerary can enter.
+    % The fallback must stay out of the list the rules iterate over. Otherwise
+    % every per-continent cap gains a seventh continent no itinerary can enter.
     assertion(\+ continent(unknown)).
 
 test(search_finds_heathrow) :-
     airport_search(lhr, 5, Results),
     memberchk(lhr, Results).
 
-% Several hundred city names are non-ASCII. SWI reads source files in the
-% locale encoding unless the file says otherwise, so a build under LC_ALL=C
-% loads the table mojibaked and serves it that way through /api/airports.
-% Asserting the declaration rather than the loaded text, because on a release
-% that already defaults to UTF-8 the text alone proves nothing.
+% Several hundred city names are non-ASCII. SWI reads source files in the locale
+% encoding unless the file says otherwise, so a build under LC_ALL=C loads the
+% table mojibaked and serves it that way through /api/airports. This asserts the
+% declaration rather than the loaded text, because on a release that already
+% defaults to UTF-8 the text alone proves nothing.
 test(the_generated_airport_table_declares_its_encoding) :-
     module_property(test_geo, file(Here)),
     file_directory_name(Here, Dir),
@@ -162,8 +164,8 @@ test(non_ascii_city_names_survive_loading) :-
     atom_codes(City, Codes),
     assertion(memberchk(0'é, Codes)).
 
-% The search folds accents so that the cities hardest to spell are still
-% reachable. This is the half that matters: an unaccented query must find them.
+% The search folds accents so the cities hardest to spell are still reachable.
+% This is the half that matters: a query typed without accents must find them.
 test(accented_cities_are_found_without_the_accents) :-
     forall(member(Query-Wanted, ['belem'-bel, 'sao paulo'-gru, 'zurich'-zrh,
                                  'malmo'-mmx, 'dusseldorf'-dus,
@@ -176,8 +178,8 @@ test(accented_queries_still_match) :-
     airport_search('Belém', 5, Results),
     assertion(memberchk(bel, Results)).
 
-% A regenerated airport table that introduces a letter the fold table does not
-% know would silently put that city out of reach of an unaccented search.
+% A regenerated airport table that brings in a letter the fold table does not
+% know would quietly put that city out of reach of an unaccented search.
 test(the_fold_table_covers_every_letter_in_the_airport_table) :-
     findall(Code,
             ( airport(_, _, _, City, _, _),
@@ -190,7 +192,7 @@ test(the_fold_table_covers_every_letter_in_the_airport_table) :-
     sort(Missing0, Missing),
     assertion(Missing == []).
 
-% Folding must reach ASCII, not merely a different accented letter.
+% Folding must reach ASCII, not just a different accented letter.
 test(folding_lands_on_ascii) :-
     findall(Code-Ascii,
             ( fold_char(Code, Ascii),

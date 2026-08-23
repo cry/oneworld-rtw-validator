@@ -8,7 +8,7 @@
 
 /** <module> Report term -> JSON dict.
 
-    The web UI needs more than the verdict: it wants to draw the route and show
+    The web UI needs more than the verdict. It wants to draw the route and show
     *why* a rule fired, so the annotated itinerary travels with the report.
 */
 
@@ -27,7 +27,8 @@
 report_json(Report, Dict) :- report_json(Report, _{}, Dict).
 
 %! report_json(+Report, +Extra, -Dict) is det.
-%  Extra is merged in last, so a caller can attach the annotated itinerary.
+%  Extra is merged in last, so a caller can attach the annotated itinerary to
+%  the report.
 report_json(report(Verdict, Violations, Fare, NotChecked, Checks), Extra, Dict) :-
     ruleset_version(Version),
     maplist(violation_json, Violations, Vs),
@@ -42,13 +43,13 @@ report_json(report(Verdict, Violations, Fare, NotChecked, Checks), Extra, Dict) 
               fare: FareDict },
     Dict = Base.put(Extra).
 
-% Rules the input could not answer at all. A client that renders `verdict`
-% without rendering this is claiming coverage the report does not give.
+% Rules the input could not answer at all. A client that shows `verdict` without
+% showing this claims coverage the report does not give.
 not_checked_json(nc(Rule, Citation, Reason),
                  _{ rule: Rule, citation: Citation, reason: Reason }).
 
-% What each rule measured, whether or not it was broken. `outcome` is derived
-% from the violations in the same report, so it cannot contradict `verdict`.
+% What each rule measured, whether or not it was broken. `outcome` comes from
+% the violations in the same report, so it cannot contradict `verdict`.
 check_json(check(Rule, Citation, Label, Outcome, Detail),
            _{ rule: Rule, citation: Citation, label: Label,
               outcome: Outcome, detail: Detail }).
@@ -62,8 +63,8 @@ violation_json(v(Rule, Citation, Severity, Message, Evidence),
     evidence_json(Evidence, Ev).
 
 %! evidence_json(+Evidence, -Dict) is det.
-%  Evidence is a list of Key(Value) terms. One generic converter keeps every
-%  rule free of serialization concerns.
+%  Evidence is a list of Key(Value) terms. One converter handles all of them, so
+%  no rule has to think about serialization.
 evidence_json(Evidence, Dict) :-
     foldl(add_evidence, Evidence, _{}, Dict).
 
@@ -95,8 +96,8 @@ fare_json(Fare, _{ continents: N,
     Discounts = Fare.discounts.
 
 %! annotations_json(+A, -Dict) is det.
-%  The derived facts the rules were decided on. Sent with every report so the
-%  UI can draw the route and explain a violation in context rather than just
+%  The derived facts the rules were decided on. They travel with every report so
+%  the UI can draw the route and explain a violation in context, rather than only
 %  printing its message.
 annotations_json(A, _{ origin: Origin,
                        mode: Mode,
@@ -110,9 +111,9 @@ annotations_json(A, _{ origin: Origin,
     place_names(Names),
     upcase_or_unknown(A.origin, Origin),
     Mode = A.mode,
-    % The same journey written as a routing, whichever way it came in. Null when
-    % a point is neither transfer nor stopover, because the notation has no way
-    % to write that down -- see io/route_out.pl.
+    % The same journey written as a routing, whichever way it came in. It is
+    % null when a point is neither transfer nor stopover, because the notation
+    % has no way to write that down -- see io/route_out.pl.
     (   annotated_route(A, R)
     ->  Routing = R
     ;   Routing = null
@@ -123,14 +124,17 @@ annotations_json(A, _{ origin: Origin,
     maplist(segment_json, A.segments, Segs),
     maplist(point_json, A.points, Points).
 
-% Sent with the report rather than fetched once from /api/ruleset, because the
-% first report can render before a separate request has come back, and a table
-% of nine short strings is cheaper than the bug where it has not.
-% The two tables are flattened into one namespace here, and nothing makes their
-% keys disjoint -- `unknown` is in both, because annotate.pl produces it for a
-% continent and for a traffic conference alike and the page has to render either.
-% So the keys are deduplicated rather than assumed unique; dict_pairs/3 throws on
-% a repeat, which turns a naming overlap into a 500 on every request.
+% These travel with the report rather than being fetched once from
+% /api/ruleset. The first report can render before a separate request comes
+% back, and a table of nine short strings costs less than the bug where it has
+% not.
+%
+% The two tables are flattened into one namespace here, and nothing keeps their
+% keys apart. `unknown` is in both, because annotate.pl produces it for a
+% continent and for a traffic conference alike, and the page has to render
+% either. So the keys are deduplicated rather than assumed unique. dict_pairs/3
+% throws on a repeat, which would turn a naming overlap into a 500 on every
+% request.
 place_names(Names) :-
     findall(Key-Name,
             ( continent_name(Key, Name) ; tc_name(Key, Name) ),
@@ -167,7 +171,7 @@ segment_json(S, _{ n: N, type: Type, from: From, to: To,
     coords_json(S.to, ToCoords).
 
 % Both the declared and the derived classification travel with the point, not
-% just the one that won, so a client can show which source decided it.
+% only the one that won, so a client can show which source decided it.
 point_json(P, _{ afterSegment: N, airport: Airport, continent: Cont,
                  kind: Kind, declaredKind: Declared, derivedKind: Derived,
                  surfaceAdjacent: Surface, groundHours: Hours }) :-

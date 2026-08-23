@@ -2,8 +2,8 @@
 
 /** <module> Report term -> human-readable text.
 
-    One of two renderers over report/5; io/json_out.pl is the other. Neither
-    contains rule logic, which is what keeps the CLI and the HTTP service
+    One of two renderers over report/5. io/json_out.pl is the other. Neither
+    holds any rule logic, which is what keeps the CLI and the HTTP service
     saying the same thing.
 */
 
@@ -19,9 +19,9 @@ explain(Report, S) :- explain(Report, S, []).
 
 %! explain(+Report, +Stream, +Options) is det.
 %  Options: `checks(true)` lists every rule that was measured, not just the
-%  ones that failed. Off by default because the list is four times the length
-%  of the verdict it supports, and on demand because "no rule was broken" is
-%  otherwise a claim the reader cannot audit.
+%  ones that failed. It is off by default because the list runs four times the
+%  length of the verdict it supports. It is available at all because otherwise
+%  "no rule was broken" is a claim the reader cannot audit.
 explain(report(Verdict, Violations, Fare, NotChecked, Checks), S, Opts) :-
     verdict_headline(Verdict, Head),
     (   tally(Violations, Tally), Tally \== ''
@@ -35,8 +35,9 @@ explain(report(Verdict, Violations, Fare, NotChecked, Checks), S, Opts) :-
 
 % --- the check register ----------------------------------------------------
 
-% Empty means the input did not parse; see the note in validate.pl. Saying so
-% is the point, since the alternative is a report that silently drops a section.
+% An empty register means the input did not parse -- see the note in
+% validate.pl. Saying so out loud is the point: the alternative is a report that
+% quietly drops a whole section.
 check_lines([], Violations, S, _) :-
     !,
     (   memberchk(v(input_error, _, _, _, _), Violations)
@@ -65,8 +66,8 @@ check_tally(Checks, Tally) :-
             Parts),
     atomic_list_concat(Parts, ', ', Tally).
 
-% Order matters: check_tally/2 reports in this order, worst first, so the one
-% exception among twenty passes is the first thing in the line.
+% The order matters. check_tally/2 reports worst first, so the one exception
+% among twenty passes is the first thing on the line.
 outcome_word(fail,           'failed').
 outcome_word(indeterminate,  'undecided').
 outcome_word(warning,        'flagged').
@@ -74,8 +75,8 @@ outcome_word(pass,           'ok').
 outcome_word(not_checked,    'not run').
 outcome_word(not_applicable, 'n/a').
 
-% A verdict that leaves rules unchecked says so on its own line. Printing the
-% headline alone would read as a clean bill of health for rules that never ran.
+% A verdict that leaves rules unchecked says so on its own line. The headline
+% alone would read as a clean bill of health for rules that never ran.
 not_checked_lines([], _) :- !.
 not_checked_lines(NCs, S) :-
     length(NCs, N),
@@ -84,8 +85,8 @@ not_checked_lines(NCs, S) :-
     forall(member(nc(_, Citation, Reason), NCs),
            format(S, '  [~w]~t~14| ~w~n', [Citation, Reason])).
 
-% Counted by severity rather than lumped together: a report carrying only
-% warnings is still valid, and calling those "violations" misreads it.
+% Counted by severity rather than lumped together. A report carrying only
+% warnings is still valid, so calling those "violations" would misread it.
 tally(Violations, Tally) :-
     findall(Part,
             ( severity_rank(Severity, _),

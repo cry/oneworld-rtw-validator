@@ -15,8 +15,8 @@
 :- multifile validate:violation/2.
 :- multifile validate:check/2.
 
-% Reported once per offending carrier segment, not once per time a Cuban
-% airport appears: a single stop shows up as both an arrival and the next
+% Reported once per offending carrier segment, not once per appearance of a
+% Cuban airport. A single stop shows up as both an arrival and the next
 % departure, which would otherwise report the same conflict twice.
 validate:violation(A, v(cuba_us_carrier, '15', error, Msg,
                         [segments([CarrierSeg]), carrier(U),
@@ -31,18 +31,18 @@ validate:violation(A, v(cuba_us_carrier, '15', error, Msg,
            [Places, U, CarrierSeg]).
 
 % A journey to Cuba with no carrier named cannot be cleared. The restriction is
-% about who flies it, and the Miami-Havana sector that puts most itineraries
-% into Cuba is American in practice -- so "it does not use American or Alaska"
-% is not something this report may say about an itinerary that names no carrier
-% at all. This is an omission in the data rather than a limit of the input mode,
-% which is what makes it indeterminate rather than not_checked: a routing may
-% carry carriers, and once it does this rule answers.
+% about who flies it, and in practice the Miami-Havana sector that puts most
+% itineraries into Cuba is American. So "it does not use American or Alaska" is
+% not something this report may say about an itinerary that names no carrier at
+% all. This is missing data rather than a limit of the input mode, which is what
+% makes it indeterminate rather than not_checked: a routing may carry carriers,
+% and once it does, this rule can answer.
 validate:violation(A, v(cuba_us_carrier, '15', indeterminate, Msg,
                         [segments(Unknown), airports(CubaAirports)])) :-
     cuba_airports(A, CubaAirports),
     CubaAirports \== [],
-    % Already settled the other way: a named American segment decides the rule,
-    % and the segments that stayed blank cannot unsettle it.
+    % Already settled the other way. A named American segment decides the rule,
+    % and the segments left blank cannot unsettle it.
     \+ restricted_us_segment(A, _, _),
     uncarried_segments(A, Unknown),
     Unknown \== [],
@@ -79,9 +79,9 @@ restricted_carrier(as).
 restricted_carrier(C) :- affiliate(aa, C, _).
 restricted_carrier(C) :- affiliate(as, C, _).
 
-% Rule 15 is about Cuba, so an itinerary that does not go there has nothing for
-% it to measure. Reporting a clean pass on the carrier half alone would read as
-% a restriction cleared rather than one never engaged.
+% Rule 15 is about Cuba, so an itinerary that never goes there gives it nothing
+% to measure. A clean pass on the carrier half alone would read as a restriction
+% cleared rather than one that never came up.
 validate:check(A, Check) :-
     cuba_airports(A, Cuba),
     (   Cuba == []
@@ -111,8 +111,9 @@ validate:check(A, Check) :-
 
 % Ticket stock is a separate section 15 provision and does not depend on the
 % routing, so it is reported as a warning against the marketing carriers used.
-% One violation however many sectors: it is a fact about the ticket rather than
-% about a sector, and one QF/JQ sector settles it for the whole ticket.
+% There is one violation however many sectors are involved. This is a fact about
+% the ticket rather than about a sector, and a single QF/JQ sector settles it for
+% the whole ticket.
 validate:violation(A, v(jq_stock_conflict, '15', warning, Msg, [segments(Ns)])) :-
     findall(N, jetstar_segment(A, N), Ns),
     Ns \== [],
@@ -130,8 +131,8 @@ jetstar_segment(A, N) :-
     S.operating == jq,
     N = S.n.
 
-% Reported as a measurement rather than declared not applicable: every ticket
-% has stock, so "which stock may be used" is always an answer this report owes.
+% Reported as a measurement rather than as not applicable. Every ticket has
+% stock, so "which stock may be used" is always an answer this report owes.
 validate:check(A, chk(jq_stock_conflict, '15', 'Ticket stock', Detail,
                       [jq_stock_conflict])) :-
     findall(N, jetstar_segment(A, N), Segs),

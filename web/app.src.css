@@ -1,11 +1,12 @@
 /* Source for web/app.css. Build with `npm run css` and commit the result.
  *
- * The generated file is committed for the same reason data/generated/airports.pl is:
- * a clone runs offline, the Docker build needs no network, and any change to the
- * output shows up as a reviewable diff. Nothing in the image knows about npm.
+ * The generated file is committed for the same reason data/generated/airports.pl
+ * is: a clone runs offline, the Docker build needs no network, and any change to
+ * the output shows up as a reviewable diff. Nothing in the image knows about npm.
  *
- * source(none) turns off Tailwind's automatic file scanning. Left on, it would walk
- * up from web/ and mine the Prolog sources for anything that looks like a class name.
+ * source(none) turns off Tailwind's automatic file scanning. Left on, it walks up
+ * from web/ and mines the Prolog sources for anything that looks like a class
+ * name.
  */
 @import "tailwindcss" source(none);
 @source "./index.html";
@@ -13,7 +14,7 @@
 
 /* --- type ---------------------------------------------------------------- */
 
-/* Served from memory by server.pl at /fonts/*, not from disk. Both are variable
+/* Served from memory by server.pl at /fonts/*, never from disk. Both fonts vary
  * on width as well as weight, which is what lets column headers run condensed
  * the way a printed timetable does without loading a second file. */
 @font-face {
@@ -34,19 +35,20 @@
 
 /* --- tokens -------------------------------------------------------------- */
 
-/* OKLCH throughout so the light and dark ramps are perceptually comparable
- * rather than only numerically similar. Neutrals carry a trace of the brand hue
- * (255) at chroma 0.004-0.016; it is below the threshold of "this is blue" and
- * above the threshold of feeling related to the accent.
+/* OKLCH throughout, so the light and dark ramps look comparable to the eye
+ * rather than merely being similar as numbers. The neutrals carry a trace of the
+ * brand hue (255) at chroma 0.004-0.016: too little to read as "this is blue",
+ * and enough to feel related to the accent.
  *
- * Every colour is one light-dark(light, dark) pair, so the two values that have
- * to stay related sit on the same line and the whole theme switches on a single
- * `color-scheme` declaration -- see the three selectors below. Dark is not a
- * programmatic lightening of light: chroma has to come down as lightness goes
- * up or the signal colours go garish, so each was re-derived.
+ * Every colour is one light-dark(light, dark) pair. The two values that have to
+ * stay related sit on the same line, and the whole theme switches on a single
+ * `color-scheme` declaration -- see the three selectors below. Dark is not light
+ * lightened by formula. Chroma has to come down as lightness goes up or the
+ * signal colours turn garish, so each dark value was worked out again from
+ * scratch.
  *
  * light-dark() resolves inside color-mix() and inside Tailwind's own opacity
- * modifiers (`bg-panel/90`), which is what makes this work at all.
+ * modifiers (`bg-panel/90`), which is what makes any of this work.
  *
  * `static` emits every token whether or not a utility references it. */
 @theme static {
@@ -59,12 +61,13 @@
   --color-ink: light-dark(oklch(0.25 0.022 255), oklch(0.928 0.008 255));
   --color-muted: light-dark(oklch(0.512 0.021 255), oklch(0.672 0.016 255));
 
-  /* Three tiers of line, because they answer to different rules. `rule` separates
-   * rows and sections and is decorative (~1.45:1). `rule-strong` is an emphasis
-   * rule under a column header (~1.9:1). `field-line` is the boundary of an input
-   * or select, which WCAG 1.4.11 requires to reach 3:1 against its background --
-   * a control you cannot find the edge of is a control you cannot use. Each value
-   * was solved for the least contrast that clears its target, so nothing shouts. */
+  /* Three weights of line, because three different rules apply to them. `rule`
+   * separates rows and sections and is decorative (~1.45:1). `rule-strong` is an
+   * emphasis rule under a column header (~1.9:1). `field-line` is the boundary of
+   * an input or select, which WCAG 1.4.11 requires to reach 3:1 against its
+   * background: a control you cannot find the edge of is a control you cannot
+   * use. Each value is the least contrast that clears its target, so nothing
+   * shouts. */
   --color-rule: light-dark(oklch(0.871 0.009 255), oklch(0.341 0.016 255));
   --color-rule-strong: light-dark(oklch(0.789 0.013 255), oklch(0.407 0.019 255));
   --color-field-line: light-dark(oklch(0.665 0.014 255), oklch(0.513 0.016 255));
@@ -89,14 +92,14 @@
   --ease-out-quart: cubic-bezier(0.25, 1, 0.5, 1);
 }
 
-/* The whole theme toggle. Absent data-theme the page follows the OS, which is
- * the default and what most people want; the two overrides exist because a
+/* The whole theme toggle. With no data-theme the page follows the OS, which is
+ * the default and what most people want. The two overrides exist because a
  * preference for one scheme is not always a preference for the same scheme
  * everywhere. Setting color-scheme rather than a class also fixes the browser's
- * own furniture -- scrollbars, form controls, the canvas behind the page.
+ * own furniture: scrollbars, form controls, and the canvas behind the page.
  *
- * Unlayered on purpose: @theme emits into @layer theme, and an unlayered rule
- * beats any layer without needing a specificity hack. */
+ * These are unlayered on purpose. @theme emits into @layer theme, and an
+ * unlayered rule beats any layer with no specificity hack needed. */
 :root {
   color-scheme: light dark;
 }
@@ -110,7 +113,7 @@
 }
 
 @layer base {
-  /* Codes and clock times are compared down columns, so digits must not shift
+  /* Codes and clock times get compared down columns, so digits must not change
    * width between rows. */
   :root {
     font-variant-numeric: tabular-nums;
@@ -141,8 +144,8 @@
     color: inherit;
   }
 
-  /* Every disclosure supplies its own marker, so the platform's is suppressed
-   * once here rather than per-summary. */
+  /* Every disclosure supplies its own marker, so the platform's is turned off
+   * once here rather than on each summary. */
   summary {
     list-style: none;
   }
@@ -152,17 +155,17 @@
 }
 
 /* Repeated pieces are declared with @utility rather than in @layer components,
- * because only @utility classes can be composed with @apply in Tailwind v4. */
+ * because in Tailwind v4 only @utility classes can be composed with @apply. */
 
 /* Anything the user would type into a GDS is set in the mono face, slightly
- * condensed to claw back column width. Anything explaining a rule is not. */
+ * condensed to win back column width. Anything explaining a rule is not. */
 @utility mono {
   @apply font-mono;
   font-stretch: 87.5%;
 }
 
-/* Section and column labels. Condensed uppercase is what a printed timetable does
- * with a header, and it buys back the width a dense table needs. */
+/* Section and column labels. Condensed uppercase is what a printed timetable
+ * does with a header, and it wins back the width a dense table needs. */
 @utility label {
   @apply font-sans text-[10px] font-semibold uppercase tracking-[0.09em] text-muted;
   font-stretch: 86%;
@@ -175,15 +178,15 @@
     @apply border-accent;
   }
   /* Disabled controls are exempt from the contrast minimum, and here they carry
-   * real meaning: a surface sector has no carrier and the final segment has no
+   * real meaning. A surface sector has no carrier, and the final segment has no
    * onward point, so those cells are not blanks waiting to be filled. */
   &:disabled {
     @apply border-rule bg-sunken text-muted;
   }
 }
 
-/* Native select keeps its keyboard behaviour; only the arrow is replaced, so the
- * control lines up with the text inputs beside it. */
+/* The native select keeps its keyboard behaviour. Only the arrow is replaced, so
+ * the control lines up with the text inputs beside it. */
 @utility field-select {
   @apply field cursor-pointer appearance-none bg-no-repeat pr-5;
   background-image: linear-gradient(45deg, transparent 50%, currentColor 50%),
@@ -196,8 +199,8 @@
   @apply field mono uppercase;
 }
 
-/* The routing is the headline input on its tab, so it is set larger and looser
- * than the codes in the table. */
+/* The routing is the main input on its tab, so it is set larger and looser than
+ * the codes in the table. */
 @utility route-input {
   @apply code-input px-2 py-2 text-[14px] tracking-[0.03em];
 }
@@ -223,22 +226,22 @@
 }
 
 /* A table of eleven columns will not fit beside the report on any screen worth
- * designing for, so it scrolls -- but silently clipped columns are the reason
- * people miss half a form. The two `local` layers are painted with the panel
- * colour and travel with the content, covering the two `scroll` shadows when
- * there is nothing more in that direction; the shadows are revealed only on the
- * side that has more to show. */
+ * designing for, so it scrolls. Silently clipped columns are how people miss
+ * half a form, though, so the edges have to say there is more. The two `local`
+ * layers are painted in the panel colour and travel with the content, covering
+ * the two `scroll` shadows when there is nothing more in that direction. A
+ * shadow therefore shows only on the side that has more to show. */
 @utility scroll-x {
   overflow-x: auto;
   overscroll-behavior-x: contain;
   /* An absolutely positioned descendant is laid out against its nearest
-   * positioned ancestor, not against the box that clips it -- so without this,
-   * the `sr-only` labels in the segment table's header (which sr-only makes
-   * absolute) sat at their static position out past 800px, escaped the clip
+   * positioned ancestor, not against the box that clips it. Without this line,
+   * the `sr-only` labels in the segment table's header -- sr-only makes them
+   * absolute -- sat at their static position out past 800px, escaped the clip,
    * and gave the whole *page* a horizontal scrollbar on a narrow screen. The
    * table itself was scrolling correctly the whole time, which is what made it
-   * look like a table problem. Positioning the scroller makes it the
-   * containing block, so what it clips is everything it contains. */
+   * look like a table problem. Positioning the scroller makes it the containing
+   * block, so it clips everything it contains. */
   position: relative;
   background:
     linear-gradient(to right, var(--color-panel) 40%, transparent) left center / 2.5rem 100% no-repeat local,
@@ -249,17 +252,17 @@
       right center / 0.75rem 100% no-repeat scroll;
 }
 
-/* Citations and rule ids: things the user could look up in the tariff. Boxed so
- * they read as a reference rather than as running text. */
+/* Citations and rule ids, which are things the user could look up in the tariff.
+ * They are boxed so they read as a reference rather than as running text. */
 @utility cite {
   @apply inline-block rounded-xs border border-rule-strong px-1 py-px
          font-mono text-[10px] font-medium;
   font-stretch: 87.5%;
 }
 
-/* Tabs are ruled, not pilled: the active one sits on the panel's own edge and
- * carries the accent, so the boundary between chooser and content stays one
- * continuous line. */
+/* Tabs are ruled rather than pilled. The active one sits on the panel's own edge
+ * and carries the accent, so the boundary between the chooser and the content
+ * stays one continuous line. */
 @utility tab {
   @apply border-transparent text-muted transition-colors duration-150;
   &:hover {
@@ -270,8 +273,9 @@
   }
 }
 
-/* The verdict is the largest thing on the page; everything under it is evidence
- * for it. Condensed hard so INDETERMINATE still fits on one line. */
+/* The verdict is the largest thing on the page, and everything under it is
+ * evidence for it. It is condensed hard so INDETERMINATE still fits on one
+ * line. */
 @utility verdict-word {
   @apply text-[2.1rem] font-extrabold uppercase leading-[0.95] tracking-[0.01em];
   font-stretch: 72%;
@@ -282,35 +286,35 @@
   font-stretch: 86%;
 }
 
-/* Two descendant selectors that are not utilities and cannot be expressed as
- * ones: both style a child based on a state held by an ancestor. */
+/* Two descendant selectors that are not utilities and cannot be written as
+ * utilities. Both style a child based on a state held by an ancestor. */
 @layer components {
   .tab[aria-selected="true"] .tab-sub {
     @apply text-accent;
   }
 
-  /* Routing-only itineraries have no clock, so the time columns go rather than
-   * inviting entries the server will refuse. */
+  /* A routing-only itinerary has no clock, so the time columns are hidden rather
+   * than inviting entries the server will refuse. */
   .hide-when .c-when {
     display: none;
   }
 
   /* A fare family means nothing unless some registered earning programme prices
-   * one, and which programmes are registered is something only /api/programs
-   * knows. So the column is hidden until it answers, and stays hidden if none of
-   * them publishes families -- the page never names a programme to decide it. */
+   * one, and only /api/programs knows which programmes are registered. So the
+   * column stays hidden until it answers, and stays hidden after that if none of
+   * them publishes families. The page never names a programme to decide it. */
   .hide-fare .c-fare {
     display: none;
   }
 
-  /* The routing grammar arrives from /api/ruleset with its terms in quotes; the
-   * page turns those into code spans. */
+  /* The routing grammar arrives from /api/ruleset with its terms in quotes, and
+   * the page turns those into code spans. */
   .hint code {
     @apply mono rounded-xs border border-rule bg-sunken px-1 py-px text-[11px] normal-case;
   }
 }
 
-/* A masthead control, set to sit beside the colour-scheme switcher as a peer
+/* A masthead control, set to sit beside the colour-scheme switcher as its equal
  * rather than above or below it: same border, same small caps, same height. */
 @utility chip {
   @apply inline-flex cursor-pointer items-center rounded-xs border border-rule px-1.5 py-0.5
@@ -322,24 +326,24 @@
   }
 }
 
-/* The one modal on the page, and it earns the exception: it explains the page
+/* The one modal on the page, and it earns the exception. It explains the page
  * rather than being part of it, so it has no place in the reading order, and a
- * reader who opens it has nothing else to do until they are done.
+ * reader who opens it has nothing else to do until they are done with it.
  *
- * A native <dialog>, so the browser supplies the parts that are usually written
- * badly by hand -- the rest of the page goes inert, Escape closes, focus returns
- * to whatever opened it, and ::backdrop is a real element to style.
+ * It is a native <dialog>, so the browser supplies the parts usually written
+ * badly by hand: the rest of the page goes inert, Escape closes it, focus
+ * returns to whatever opened it, and ::backdrop is a real element to style.
  *
- * Sized to the text rather than the viewport: prose is capped near 68ch inside,
- * and the box stops short of the window edge on both axes so the whole of it is
- * always reachable. It is a column with a scrolling middle rather than one
+ * It is sized to the text rather than to the viewport. Prose is capped near 68ch
+ * inside, and the box stops short of the window edge on both axes, so all of it
+ * is always reachable. It is a column with a scrolling middle rather than one
  * scrolling box, so the title and the two ways out stay on screen however far
- * down the reader is -- a modal whose only exit has scrolled away is the reason
- * modals have their reputation. */
+ * down the reader has got. A modal whose only exit has scrolled away is the
+ * reason modals have the reputation they do. */
 .help-dialog {
-  /* The UA centres a modal dialog with margin:auto against its inset-0 box, and
-   * preflight's `margin: 0` on everything takes that away. Putting it back is
-   * the whole of the positioning. */
+  /* The browser centres a modal dialog with margin:auto against its inset-0 box,
+   * and preflight's `margin: 0` on everything takes that away. Putting it back is
+   * the whole of the positioning here. */
   margin: auto;
   width: min(50rem, calc(100vw - 2rem));
   max-height: calc(100dvh - 4rem);
@@ -384,23 +388,24 @@
 
 /* --- filling a column ------------------------------------------------------
  *
- * The spreadsheet gesture: the focused cell carries a small square at the corner
- * of its control, and dragging it down the column copies the value into every
- * row it crosses. Only the columns that describe the ticket rather than the
- * sector carry one -- see FILLABLE in app.js for which, and why.
+ * The spreadsheet gesture. The focused cell carries a small square at the corner
+ * of its control, and dragging that square down the column copies the value into
+ * every row it crosses. Only the columns that describe the ticket rather than
+ * the sector carry one; see FILLABLE in app.js for which, and why.
  *
  * The handle hangs off the corner of a wrapper around the control rather than
- * off the cell: the table is width:full and hands its spare width to the
+ * off the cell. The table is width:full and hands its spare width to the
  * columns, so a cell is wider than the field inside it by an amount that depends
- * on the viewport. Anchored to the cell the square drifted away from the field
- * it belongs to. inline-flex rather than inline-block so the wrapper hugs the
- * control exactly -- whitespace-only children are not rendered in a flex
- * container, and the template has a newline in there.
+ * on the viewport. Anchored to the cell, the square drifted away from the field
+ * it belongs to. It is inline-flex rather than inline-block so the wrapper hugs
+ * the control exactly: a flex container does not render whitespace-only
+ * children, and the template has a newline in there.
  *
- * Unlayered, not in components: the fields it recolours are styled by utilities,
- * and a later cascade layer beats any specificity an earlier one can reach. In
- * components this rule lost to .code-input every time and the preview simply did
- * not appear. Unlayered styles win over every layer, which is what it needs. */
+ * This is unlayered rather than in components. The fields it recolours are
+ * styled by utilities, and a later cascade layer beats any specificity an
+ * earlier one can reach. In components, this rule lost to .code-input every time
+ * and the preview simply did not appear. Unlayered styles beat every layer,
+ * which is what it needs. */
 .fillable {
   position: relative;
   display: inline-flex;
@@ -408,14 +413,15 @@
 
 .fill-handle {
   position: absolute;
-  /* Half on the field, half off it: a grip on the corner, not a mark inside. */
+  /* Half on the field and half off it: a grip on the corner, not a mark inside
+   * it. */
   right: -3px;
   bottom: -3px;
   width: 7px;
   height: 7px;
   background: var(--color-accent);
-  /* Against the panel, so the square reads as sitting on the corner rather than
-   * as part of the field's border. */
+  /* Set against the panel, so the square reads as sitting on the corner rather
+   * than as part of the field's border. */
   border: 1px solid var(--color-panel);
   border-radius: 1px;
   cursor: crosshair;
@@ -423,9 +429,9 @@
   touch-action: none;
 }
 
-/* What the release will write to. Border and wash rather than an outline: the
- * fields are 1px-bordered already, so recolouring that border costs no layout
- * and cannot nudge the row mid-drag. */
+/* What letting go will write to. A border and a wash rather than an outline: the
+ * fields already have a 1px border, so recolouring it costs no layout and cannot
+ * nudge the row mid-drag. */
 .fill-target :is(input, select) {
   border-color: var(--color-accent);
   background-color: color-mix(in oklch, var(--color-accent) 18%, var(--color-panel));
@@ -433,23 +439,23 @@
 
 /* --- an abbreviated column heading ----------------------------------------
  *
- * Thirteen columns is what forces "Mkt" and "Op" and "Cls", and the expansion
- * has to be one hover away rather than something the reader works out. Not a
- * native `title`: that waits about a second, renders in the OS's type at the
+ * Thirteen columns is what forces "Mkt", "Op" and "Cls", and what they stand for
+ * has to be one hover away rather than something the reader works out. A native
+ * `title` will not do: it waits about a second, renders in the OS's type at the
  * OS's size, and cannot say which of the two carrier columns is which without
  * looking like a system message.
  *
- * Hover is the only way to *see* it, and that is not a gap. Generated content
- * is in the accessibility tree, so the heading reads as "MKT, marketing carrier
- * — whose code is on the ticket" whether or not anything is hovered, and every
- * field under it carries the full name again in its own aria-label — "Segment 3
- * operating carrier". Both paths that do not involve a pointer already have it.
- * Making the headings focusable to add a keyboard path would put four new tab
- * stops in front of the fields and give nothing that is not already said.
+ * Hover is the only way to *see* it, and that is not a gap. Generated content is
+ * in the accessibility tree, so the heading reads as "MKT, marketing carrier —
+ * whose code is on the ticket" whether or not anything is hovered. Every field
+ * under it carries the full name again in its own aria-label, as in "Segment 3
+ * operating carrier". Both of the paths that do not involve a pointer already
+ * have it. Making the headings focusable to add a keyboard path would put four
+ * new tab stops in front of the fields and say nothing new.
  *
  * It opens downward because the header sits at the top of a scroller that clips
- * on both axes (overflow-x: auto computes overflow-y to auto, not visible), and
- * a tooltip above the heading would be cut off by the box it is inside. */
+ * on both axes -- overflow-x: auto computes overflow-y to auto, not visible --
+ * and a tooltip above the heading would be cut off by the box it is inside. */
 .abbr {
   position: relative;
   cursor: help;
@@ -468,7 +474,7 @@
   border-radius: var(--radius-xs);
   background: var(--color-panel);
   color: var(--color-ink);
-  /* The heading is uppercase with tracking; a sentence is not. */
+  /* The heading is uppercase with tracking. A sentence is not. */
   font-size: 11.5px;
   font-weight: 400;
   font-stretch: 100%;
@@ -487,9 +493,10 @@
   .abbr::after { transition: none; }
 }
 
-/* Three states, not two: "follow the OS" is the default and has to stay
- * reachable after someone has overridden it. Real radio inputs, kept focusable
- * rather than display:none, so arrow keys move between them for free. */
+/* Three states rather than two. "Follow the OS" is the default and has to stay
+ * reachable after someone has overridden it. These are real radio inputs, kept
+ * focusable rather than display:none, so arrow keys move between them for
+ * free. */
 @layer components {
   .theme {
     @apply inline-flex overflow-hidden rounded-xs border border-rule;
@@ -509,7 +516,7 @@
     @apply bg-accent text-panel;
   }
 
-  /* The input itself is visually hidden, so the ring has to go on the label. */
+  /* The input itself is hidden from view, so the ring has to go on the label. */
   .theme input:focus-visible + label {
     outline: 2px solid var(--color-accent);
     outline-offset: -2px;
@@ -519,9 +526,9 @@
 /* --- the route map ------------------------------------------------------- */
 
 /* Everything is drawn with tokens rather than literal colours, so the map
- * follows the theme with no second palette and no redraw on a scheme change.
- * The SVG scales with the panel: it is vector, so one render serves every size
- * and there is nothing to recompute on resize. */
+ * follows the theme with no second palette and no redraw when the scheme
+ * changes. The SVG scales with the panel. It is vector, so one render serves
+ * every size and there is nothing to recompute on resize. */
 @layer components {
   .map {
     @apply block w-full rounded-xs border border-rule bg-sunken;
@@ -547,7 +554,7 @@
     stroke-linecap: round;
   }
 
-  /* A surface sector is the one leg the traveller arranges, and 4(g) turns on
+  /* A surface sector is the one leg the traveller arranges, and 4(g) depends on
    * telling it apart from a flight. */
   .map-arc.is-surface {
     stroke-dasharray: 4 3;
@@ -560,8 +567,8 @@
     stroke-width: 1.2;
   }
 
-  /* Hollow, because a transfer is a point the journey passes through rather
-   * than one it stops at -- the same distinction the report's colour makes. */
+  /* Hollow, because a transfer is a point the journey passes through rather than
+   * one it stops at. The report's colour makes the same distinction. */
   .map-stop.is-transfer {
     fill: var(--color-sunken);
     stroke: var(--color-muted);
@@ -593,9 +600,9 @@
   }
 }
 
-/* One orchestrated entrance when a report lands, rather than motion scattered
- * across the page. 140ms is below the threshold where a repeated action starts
- * to feel like waiting. */
+/* One entrance for the whole report when it lands, rather than motion scattered
+ * across the page. 140ms is below the point where a repeated action starts to
+ * feel like waiting. */
 @keyframes settle {
   from {
     opacity: 0;
@@ -603,24 +610,24 @@
   }
 }
 
-/* The way back up the page, floating over the answer. A border and the panel
- * colour rather than a shadow: everything else that sits above the page here is
- * a bordered flat panel, and a drop-shadowed pill would be the one element
- * pretending to be somewhere else.
+/* The way back up the page, floating over the answer. It uses a border and the
+ * panel colour rather than a shadow: everything else that sits above the page
+ * here is a bordered flat panel, and a drop-shadowed pill would be the one
+ * element pretending to be somewhere else.
  *
- * Toggled with the `hidden` attribute rather than opacity, because a button
- * faded to nothing is still in the tab order -- a control the keyboard can
- * reach and the eye cannot find. The cost is that it cannot fade out; it fades
- * in, which is the appearance anyone is looking at. */
+ * It is toggled with the `hidden` attribute rather than with opacity, because a
+ * button faded to nothing is still in the tab order: a control the keyboard can
+ * reach and the eye cannot find. The cost is that it cannot fade out. It only
+ * fades in, and that is the appearance anyone is actually looking at. */
 @layer components {
-  /* A firmer edge than the buttons inside the form, and for a reason rather than
-   * for emphasis: those sit in a panel that frames them, and this one floats
-   * over whatever the reader has scrolled to, with its own border as the only
-   * thing saying where it ends. That is the case WCAG 1.4.11 is about, and the
-   * background it has to clear is the page canvas as well as a panel -- where
-   * field-line, sized for a control sitting *on* a panel, reaches only 2.81:1.
-   * `muted` clears 3:1 on both grounds in both themes; check-contrast.mjs
-   * carries the pair. */
+  /* A firmer edge than the buttons inside the form, for a reason rather than for
+   * emphasis. Those buttons sit in a panel that frames them. This one floats over
+   * whatever the reader has scrolled to, with its own border as the only thing
+   * saying where it ends. That is the case WCAG 1.4.11 is about, and the
+   * background it has to clear is the page canvas as well as a panel. Against the
+   * canvas, field-line -- sized for a control sitting *on* a panel -- reaches only
+   * 2.81:1. `muted` clears 3:1 on both grounds in both themes, and
+   * check-contrast.mjs carries the pair. */
   .to-top {
     @apply fixed bottom-4 right-4 z-30 inline-flex cursor-pointer items-center gap-1.5
            rounded-xs border border-muted bg-panel px-3 py-1.5 text-[12.5px]
@@ -644,31 +651,33 @@
   }
 }
 
-/* The form is a sidebar while the Routing tab is open -- one text field does not
+/* The form is a sidebar while the Routing tab is open. One text field does not
  * need half a page, and the report is what the page is for. The Segments tab is
- * a thirteen-column table, and the sidebar it used to widen into was still too
- * narrow for it: measured against a seven-segment journey the table wants 878px
- * with no clock and 1,262px with dates and times, and half of a 1,680px page is
- * 814px. It was reflowing the whole layout to hand the table a column it then
- * scrolled inside anyway. So it takes the page, and the answer goes underneath,
- * where the table fits at either width with nothing to scroll. */
+ * a thirteen-column table, and the widened sidebar it used to get was still too
+ * narrow. Measured against a seven-segment journey, the table wants 878px with
+ * no clock and 1,262px with dates and times, and half of a 1,680px page is
+ * 814px. So the layout was reflowing the whole page to hand the table a column
+ * it then scrolled inside anyway. Now the form takes the page and the answer
+ * goes underneath, where the table fits at either width with nothing to
+ * scroll. */
 @media (width >= 80rem) {
   #layout.wide-form {
     grid-template-columns: minmax(0, 1fr);
   }
 }
 
-/* The answer is two sub-columns once there is room for both to stay readable.
- * Stacked, the map -- the tallest thing on the page by a wide margin -- sat
- * between the reader and everything printed after it, which is where the
- * earning panel ended up. Beside, the scroll is the taller of the two rather
- * than the sum, and nothing had to be hidden to get there.
+/* The answer becomes two sub-columns once there is room for both to stay
+ * readable. Stacked, the map -- the tallest thing on the page by a wide margin
+ * -- sat between the reader and everything printed after it, which is where the
+ * earning panel ended up. Side by side, the scroll is the taller of the two
+ * rather than the sum of them, and nothing had to be hidden to get there.
  *
- * Two thresholds because the answer is not the same width in the two tabs: it
- * shares the page with the sidebar under Routing and has all of it under
- * Segments, so the viewport at which it can carry two readable columns differs
- * by exactly the sidebar. Both are page layout, which is what viewport queries
- * are for; neither panel cares how wide the other is. */
+ * There are two thresholds, because the answer is not the same width in the two
+ * tabs. It shares the page with the sidebar under Routing and gets all of it
+ * under Segments, so the viewport at which it can carry two readable columns
+ * differs by exactly the width of the sidebar. Both are page layout, which is
+ * what viewport queries are for, and neither panel cares how wide the other
+ * is. */
 #answer {
   display: grid;
   gap: 1rem;
@@ -687,14 +696,14 @@
   }
 }
 
-/* Switching tabs moves three panels at once. Naming them hands the browser the
- * before and after of each box so it can animate between them; without the
- * names the whole page cross-fades in place, which is a different and much worse
- * effect -- the report appears to dissolve rather than to move.
+/* Switching tabs moves three panels at once. Naming them gives the browser the
+ * before and after of each box, so it can animate between them. Without the
+ * names, the whole page cross-fades in place, which is a different and much
+ * worse effect: the report appears to dissolve rather than to move.
  *
  * The form is named too, even though its contents are replaced rather than
- * moved: a routing field morphing into a table over 240ms reads as one panel
- * changing what it holds, which is what happened. */
+ * moved. A routing field morphing into a table over 240ms reads as one panel
+ * changing what it holds, and that is exactly what happened. */
 #entry {
   view-transition-name: entry;
 }
@@ -712,9 +721,9 @@
   animation-timing-function: var(--ease-out-quart);
 }
 
-/* The root snapshot is everything not named above -- the masthead, the page
- * background. None of it moves, so cross-fading it only makes the text under
- * the moving panels shimmer. */
+/* The root snapshot is everything not named above: the masthead and the page
+ * background. None of it moves, so cross-fading it only makes the text under the
+ * moving panels shimmer. */
 ::view-transition-image-pair(root) {
   animation: none;
 }

@@ -8,11 +8,11 @@
 
 /** <module> Section 12 premium-economy surcharge matrix.
 
-    A third taxonomy again -- section 12 needs regions the section 0 continent
-    list does not have at all (South East Asia, South Asian Subcontinent,
-    Japan/Korea, French Polynesia, Australia as distinct from the rest of the
-    South West Pacific), so it gets its own table rather than being bolted onto
-    countries.pl.
+    Another taxonomy of its own. Section 12 needs regions the section 0
+    continent list does not have at all: South East Asia, South Asian
+    Subcontinent, Japan/Korea, French Polynesia, and Australia as distinct from
+    the rest of the South West Pacific. So it gets its own table rather than
+    being bolted onto countries.pl.
 */
 
 term_expansion(special_group(Region, List), Facts) :-
@@ -28,7 +28,7 @@ special_group(south_asian_subcontinent,['AF','BD','BT','IN','LK','MV','NP','PK']
 special_group(japan_korea,             ['JP','KP','KR']).
 
 %! fare_region(+Country, +Continent, +Zone, -Region) is det.
-%  Falls back to the continent where section 12 needs no finer split.
+%  Falls back to the continent wherever section 12 needs no finer split.
 fare_region(Country, _Continent, _Zone, Region) :-
     special_region(Country, Region), !.
 fare_region(_Country, europe_middle_east, Zone, Zone) :- !.
@@ -42,10 +42,10 @@ swp_region(french_polynesia).
 swp_region(swp_other).
 
 %! sector_surcharge(+FromRegion, +ToRegion, -Usd) is det.
-%  Clause order is significant -- the bands overlap and the rule resolves them
-%  by specificity, so the narrower band must be listed first. In particular
-%  New Zealand-French Polynesia must precede "sectors within SWP", and French
-%  Polynesia-Americas must precede "SWP other than Australia"-Americas.
+%  Clause order matters here. The bands overlap, and the rule resolves them by
+%  specificity, so the narrower band has to come first. In particular, New
+%  Zealand-French Polynesia must come before "sectors within SWP", and French
+%  Polynesia-Americas must come before "SWP other than Australia"-Americas.
 sector_surcharge(A, B, Usd) :- once(band(A, B, Usd)).
 
 band(A, B, 1900) :- pair(A, B, X, Y), swp_region(X), memberchk(Y, [africa, europe, middle_east]).
@@ -61,12 +61,12 @@ band(A, B,  250) :- swp_region(A), swp_region(B).
 band(_, _,  950).
 
 %! pair(+A, +B, ?X, ?Y) is nondet.
-%  Every band is direction-independent.
+%  Direction does not matter to any band.
 pair(A, B, A, B).
 pair(A, B, B, A).
 
 %! surcharge_bands(-Rows) is det.
-%  Human-readable band list for the /api/ruleset endpoint.
+%  The band list written out for a reader, for the /api/ruleset endpoint.
 surcharge_bands(
     [ band('SWP <-> Africa; SWP <-> Europe/Middle East',        1900),
       band('Australia <-> North America / South America',       1700),

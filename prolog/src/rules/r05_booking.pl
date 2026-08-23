@@ -2,38 +2,38 @@
 
 /** <module> Rule 5(b) -- booking codes.
 
-    Section 5(b) publishes, per carrier, the class an Explorer fare books into
-    in each cabin. A ticket sold in some other code is not this fare.
+    Section 5(b) publishes, for each carrier, the class an Explorer fare books
+    into in each cabin. A ticket sold in any other code is not this fare.
 
-    The rule is checkable only when the itinerary says what class it was sold
-    in, which is optional. That is deliberately *not* `indeterminate`: an
-    itinerary written as a routing has no place to put a booking code at all,
-    and treating a fare notation as an incomplete segment table would make every
-    routing undecidable over a field the notation cannot express. What the
-    register says instead is that there was no code to read -- see the chk_na at
-    the foot of this file. The moment one segment names a class, every segment
+    The rule can only be checked when the itinerary says what class it was sold
+    in, and that field is optional. A missing class is *not* `indeterminate`, on
+    purpose. An itinerary written as a routing has nowhere to put a booking code
+    at all, and treating a fare notation as an incomplete segment table would
+    make every routing undecidable over a field the notation cannot express. So
+    the register says instead that there was no code to read -- see the chk_na at
+    the foot of this file. As soon as one segment names a class, every segment
     that names one is measured.
 
-    Three outcomes, because 5(b) has three kinds of class in it:
+    There are three outcomes, because 5(b) has three kinds of class in it:
 
       * the applicable code for the cabin -- ok;
-      * a code the notes permit only in a stated case -- also ok, and recorded
-        in the register with the case it leans on;
+      * a code the notes allow only in a stated case -- also ok, and recorded in
+        the register along with the case it leans on;
       * anything else -- an error.
 
-    The second used to be a warning and is not one. "For flights where First or
-    Business Class is not offered or available, passengers may travel in a lower
-    class, in the applicable booking code for that lower class" is a permission
-    the tariff grants, and a ticket sold under it is a correct ticket. The
-    condition is about what the *flight* offers -- a seat map, which no
-    itinerary carries -- but it is also a condition the airline's own inventory
-    settled at the moment of sale: the code is in the itinerary because a seat
-    in it was sold. There is nothing here for a traveller to fix, and a warning
-    that cannot be acted on is noise in front of the ones that can.
+    The second used to be a warning, and should not be. "For flights where First
+    or Business Class is not offered or available, passengers may travel in a
+    lower class, in the applicable booking code for that lower class" is a
+    permission the tariff grants, and a ticket sold under it is a correct ticket.
+    The condition is about what the *flight* offers, which means a seat map, and
+    no itinerary carries one. But it is also a condition the airline's own
+    inventory settled at the moment of sale: the code is in the itinerary
+    because a seat in it was sold. There is nothing here for a traveller to fix,
+    and a warning nobody can act on only gets in the way of the ones they can.
 
-    What the case is still worth saying, so it is said where statements of fact
+    The case is still worth stating, so it is stated where statements of fact
     belong: the check register names the segments and the note they rely on. The
-    outcome of the check is unaffected, which is the point.
+    outcome of the check does not change, which is the point.
 */
 
 :- use_module('../geo').
@@ -50,16 +50,16 @@
 
 %! classed_flight(+A, -S) is nondet.
 %  A flown segment that states the class it was sold in. Surface sectors are
-%  excluded: nobody sells them and 5(b) has no column for them.
+%  left out: nobody sells them, and 5(b) has no column for them.
 classed_flight(A, S) :-
     ann_seg(A, S),
     S.type == flight,
     S.booking_class \== unknown.
 
 %! row_for(+S, -Carrier, -Scope) is semidet.
-%  Which 5(b) row a segment is read against. The *marketing* carrier decides
-%  it, because 5(b) is about the code the fare is sold in and the seller is who
-%  sells it -- unlike 4(j), which turns on who operates.
+%  Which 5(b) row a segment is read against. The *marketing* carrier decides,
+%  because 5(b) is about the code the fare is sold in, and the seller is the one
+%  who sells it. This is unlike 4(j), which turns on who operates.
 %
 %  Scope is `any` unless the carrier publishes separate domestic rows.
 row_for(S, Carrier, Scope) :-
@@ -80,16 +80,15 @@ applicable(Carrier, Scope, Cabin, Class) :-
     booking_code(Carrier, Scope, Column, Class),
     !.
 % An economy Explorer fare buys premium economy through section 12's per-sector
-% surcharge rather than through a fare basis of its own, so the premium cabin
-% codes are codes an economy fare books into. src/pricing.pl already prices the
-% surcharge for the whole journey; this is the same arrangement seen per
-% segment.
+% surcharge, not through a fare basis of its own. So the premium cabin codes are
+% codes an economy fare books into. src/pricing.pl already prices the surcharge
+% for the whole journey; this is the same arrangement seen one segment at a time.
 applicable(Carrier, _, economy, Class) :-
     premium_economy_code(Carrier, Class).
 
 %! conditional(+S, +Carrier, +Scope, +Cabin, +Class, -Reason) is nondet.
-%  A code the notes to 5(b) permit, but only where something about the flight
-%  is true that an itinerary cannot show.
+%  A code the notes to 5(b) allow, but only where something is true about the
+%  flight that an itinerary cannot show.
 conditional(_, Carrier, Scope, Cabin, Class, lower_class-Reason) :-
     lower_column(Cabin, Column),
     booking_code(Carrier, Scope, Column, Class),
@@ -99,8 +98,8 @@ conditional(_, Carrier, Scope, Cabin, Class, lower_class-Reason) :-
     format(atom(Reason),
            'it is the ~w code, which ~w fare may use only where ~w is not offered or not available on that flight',
            [Lower, Fare, Word]).
-% Carrier-free, deliberately: it is the same permission whichever airline the
-% ticket is on, and naming one in the sentence would make two sectors under one
+% This names no carrier, on purpose. It is the same permission whichever airline
+% the ticket is on, and naming one would make two sectors under a single
 % permission read as two different permissions.
 conditional(_, Carrier, _, business, Class, business_alternate-Reason) :-
     business_alternate_code(Carrier, Class),
@@ -109,9 +108,9 @@ conditional(_, _, _, first, Class, first_alternate-Reason) :-
     first_alternate_code(Class),
     Reason = 'a First fare may book Y only where the applicable lower-class code is unavailable'.
 % The exception is written "for services within the Middle East", so it is a
-% fact about the sector and not about the carrier: a QR flight from Doha to
-% Bangkok is not within the Middle East and A is not open to it. Both endpoints
-% have to be in the zone -- which is the same zone 4(c)(b) and the section 12
+% fact about the sector rather than the carrier. A QR flight from Doha to
+% Bangkok is not within the Middle East, so A is not open to it. Both endpoints
+% have to be in the zone. It is the same zone 4(c)(b) and the section 12
 % surcharge band are written in, and the reason geo.pl tracks it at all.
 conditional(S, Carrier, _, business, Class, middle_east-Reason) :-
     middle_east_business_code(Carrier, Class),
@@ -119,8 +118,9 @@ conditional(S, Carrier, _, business, Class, middle_east-Reason) :-
     S.to_zone == middle_east,
     Reason = 'the 5(b) exception allows it on QR for services within the Middle East where no Business Class is offered, which does not apply where Business exists but is merely unavailable'.
 
-% "Lower" in fare order. First falls back through both business columns and
-% then economy; business falls back to economy; economy has nothing below it.
+% "Lower" means lower in fare order. First falls back through both business
+% columns and then economy. Business falls back to economy. Economy has nothing
+% below it.
 lower_column(first,    business_done).
 lower_column(first,    business_ione3).
 lower_column(first,    economy).
@@ -131,8 +131,8 @@ cabin_word(business, 'Business').
 cabin_word(economy,  'Economy').
 
 % The cabin a column belongs to. data/booking_codes.pl names the columns in
-% full -- "Business on a DONE fare" -- which is what the register wants and too
-% much for the middle of a sentence about falling back to a lower cabin.
+% full, as in "Business on a DONE fare". That is what the register wants, and
+% too much for the middle of a sentence about falling back to a lower cabin.
 column_cabin_word(first,          'First').
 column_cabin_word(business_done,  'Business').
 column_cabin_word(business_ione3, 'Business').
@@ -140,10 +140,10 @@ column_cabin_word(economy,        'Economy').
 
 % --- violations ------------------------------------------------------------
 
-% Aggregated, on the same reasoning marketing_carrier_missing gives in
-% r04_routing.pl: a fare sold in the wrong code on six sectors is one thing gone
-% wrong, and six near-identical sentences bury whatever else the report has to
-% say. One violation per distinct case, never one per segment.
+% Grouped, for the reason marketing_carrier_missing gives in r04_routing.pl. A
+% fare sold in the wrong code on six sectors is one thing gone wrong, and six
+% near-identical sentences bury whatever else the report has to say. One
+% violation per distinct case, never one per segment.
 validate:violation(A, v(booking_code, '5(b)', error, Msg,
                         [segments(Ns), sold(Sold), expected(Expected)])) :-
     findall(N-Given-U-Exp,
@@ -176,11 +176,10 @@ validate:violation(A, v(booking_code, '5(b)', error, Msg,
     ).
 
 %! conditional_note(+A, ?Kind, -Note) is nondet.
-%  One sentence per permission leaned on, for the register. Grouped by the case
-%  that permits the code rather than by the segment, on the reasoning
-%  marketing_carrier_missing gives in r04_routing.pl: two sectors under one
-%  permission are one fact, and two sectors under different permissions stay
-%  two.
+%  One sentence per permission relied on, for the register. Grouped by the case
+%  that allows the code rather than by segment, for the reason
+%  marketing_carrier_missing gives in r04_routing.pl. Two sectors under one
+%  permission are one fact; two sectors under different permissions stay two.
 conditional_note(A, Kind, Note) :-
     conditional_kind(Kind),
     findall(N-Given-U,
@@ -212,8 +211,8 @@ conditional_kind(business_alternate).
 conditional_kind(first_alternate).
 conditional_kind(middle_east).
 
-% "H on AA", "H on AA and B on BA". The code and the carrier stay together
-% because either alone is not enough to look the row up.
+% "H on AA", "H on AA and B on BA". The code and the carrier stay together,
+% because neither one alone is enough to look the row up.
 sold_phrase(Rows, Phrase) :-
     findall(Item,
             ( member(_-Given-U-_, Rows), format(atom(Item), '~w on ~w', [Given, U]) ),
@@ -221,9 +220,9 @@ sold_phrase(Rows, Phrase) :-
     list_to_set(Items0, Items),
     listed_and(Items, Phrase).
 
-% A class was given and the row it should be read against could not be found.
-% Reported once for the whole itinerary rather than per segment: the reason is
-% the same each time and a per-segment version would bury the one fact worth
+% A class was given, but the row it should be read against could not be found.
+% Reported once for the whole itinerary rather than per segment. The reason is
+% the same every time, and a per-segment version would bury the one fact worth
 % having, which is which segments to fix.
 validate:violation(A, v(booking_code_unreadable, '5(b)', indeterminate, Msg,
                         [segments(Ns)])) :-
@@ -238,9 +237,9 @@ validate:violation(A, v(booking_code_unreadable, '5(b)', indeterminate, Msg,
            [Where, States, Names]).
 
 %! expected_phrase(+Carrier, +Scope, +Cabin, -Phrase) is det.
-%  The applicable code, written the way the table publishes it. Business has
-%  two columns and they are usually different letters, so naming only one would
-%  read as though the other were a violation.
+%  The applicable code, written the way the table publishes it. Business has two
+%  columns, usually with different letters, so naming just one would make the
+%  other look like a violation.
 expected_phrase(Carrier, Scope, business, Phrase) :-
     !,
     booking_code(Carrier, Scope, business_done, D0), upcase_atom(D0, D),
@@ -264,8 +263,8 @@ expected_phrase(Carrier, Scope, Cabin, Phrase) :-
 
 % --- the register ----------------------------------------------------------
 
-% An itinerary that states no class at all engages nothing here. That is `n/a`
-% rather than `undecided` for the reason given at the top of this file: the
+% An itinerary that states no class at all touches nothing here. That is `n/a`
+% rather than `undecided`, for the reason given at the top of this file: the
 % class is optional input, and a routing has nowhere to write one.
 validate:check(A, chk_na(booking_code, '5(b)', 'Booking codes', Reason)) :-
     \+ classed_flight(A, _),
@@ -290,8 +289,8 @@ validate:check(A, chk(booking_code, '5(b)', 'Booking codes', Detail,
     findall(Note, conditional_note(A, _, Note), Notes),
     atomic_list_concat([Head|Notes], ' ', Detail).
 
-% One clause per outcome, in the order a reader wants them: what went wrong
-% first, then what is merely conditional, then what is fine.
+% One clause per outcome, in the order a reader wants them. What went wrong
+% comes first, then what is only conditional, then what is fine.
 register_part(Counts, Part) :-
     member(Outcome-Phrase,
            [ wrong-'not a code 5(b) names',

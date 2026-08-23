@@ -2,8 +2,8 @@
 
 /** <module> Rule 19 -- children and infants.
 
-    The arithmetic itself is informational and lives in pricing.pl; what is
-    checkable here is eligibility.
+    The arithmetic is information for the reader and lives in pricing.pl. What
+    can be checked here is eligibility.
 */
 
 :- use_module('../geo').
@@ -65,13 +65,13 @@ validate:violation(A, v(infant_age_unstated, '19', warning, Msg, [])) :-
            'An infant is booked without an age; if the infant turns 2 before travel is complete a full child fare is required for the entire journey.',
            []).
 
-% The same clause, for an infant who is under 2 now. The input carries an age
-% and not a date of birth, so a one-year-old who turns 2 next month and one who
-% turned 1 last week are the same value here. On a fare whose journey may run a
-% full twelve months the first is a live case rather than a remote one, and the
-% consequence -- a full child fare for the entire journey, bought retroactively
-% -- is expensive enough to be worth saying out loud. Reported as a warning
-% because it is a question about a date nobody supplied, not a rule broken.
+% The same clause, for an infant who is under 2 today. The input carries an age
+% rather than a date of birth, so a one-year-old who turns 2 next month and one
+% who turned 1 last week look identical here. On a fare whose journey may run a
+% full twelve months, the first case is a real risk rather than a remote one,
+% and the consequence -- a full child fare for the entire journey, bought after
+% the fact -- is expensive enough to say out loud. It is a warning because it is
+% a question about a date nobody supplied, not a rule broken.
 validate:violation(A, v(infant_turns_two, '19', warning, Msg, [age(Age), max(Max)])) :-
     member(P, A.passengers),
     P.type == infant,

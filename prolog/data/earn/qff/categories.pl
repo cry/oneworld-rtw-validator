@@ -12,23 +12,23 @@
     data/earn/sources/qff-categories.json, read 2026-08-11 from
     https://www.qantas.com/en-au/frequent-flyer/calculators/earning-tables/categories
 
-    Which category a segment earns in, from the marketing carrier and the class
-    it is sold in. The category is then priced by data/earn/qff/bands.pl.
+    Which category a segment earns in, worked out from the marketing carrier and
+    the class it is sold in. data/earn/qff/bands.pl then prices the category.
 
-    Only the sixteen carriers Rule 3015 4(j) permits are here; Qantas publishes
+    Only the sixteen carriers Rule 3015 4(j) permits are here. Qantas publishes
     categories for airlines an Explorer fare may not be flown on at all.
 
     Rows superseded by a later effective date are dropped rather than carried,
-    because nothing yet reads an effective date -- see PLANS/05, phase 4. The
+    because nothing reads an effective date yet -- see PLANS/05, phase 4. The
     dates that were in force at the capture are recorded in source.pl.
 */
 
 %! earn_scope(?Scope, ?Kind) is nondet.
-%  How a scope is decided for a segment. `always` applies to everything,
-%  `sector` is decided from the two endpoints, `residual` applies when no
-%  sector scope of the same carrier did, and `region` needs the region tables
-%  that phase 2 adds -- until then a segment that could fall either side of one
-%  is priced only where the candidate rows agree.
+%  How a scope is decided for a segment. `always` applies to everything.
+%  `sector` is decided from the two endpoints. `residual` applies when no
+%  sector scope of the same carrier did. `region` needs the region tables that
+%  phase 2 adds; until then, a segment that could fall either side of one is
+%  priced only where the candidate rows agree.
 earn_scope(all,           always).
 earn_scope(international, sector).
 earn_scope(domestic,      sector).
@@ -423,8 +423,8 @@ earn_category(wy, all, f, first).
 earn_category(wy, all, a, first).
 
 %! earn_category_unpublished(?Carrier, ?Scope, ?Reason) is nondet.
-%  A row the table names but does not fill in. It is not an absence of earn:
-%  it is an earn this table cannot state, so it must reach the reader as
+%  A row the table names but never fills in. It does not mean there is no earn.
+%  It is an earn this table cannot state, so it has to reach the reader as
 %  undecided rather than as nothing.
 earn_category_unpublished(jl, within_japan, 'awarded on information provided by Japan Airlines; not tabulated').
 earn_category_unpublished(nu, within_japan, 'awarded on information provided by Japan Airlines; not tabulated').

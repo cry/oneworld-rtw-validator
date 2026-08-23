@@ -2,28 +2,29 @@
 
 /** <module> Accent folding for search.
 
-    Typeahead is matched on a folded copy of both sides, so `sao paulo` finds
-    Sao Paulo and `zurich` finds Zurich. Someone looking up an airport is
-    typing on whatever keyboard they have, and a city they cannot spell the
-    accents of is exactly the one they need the search for.
+    Typeahead matches a folded copy of both sides, so `sao paulo` finds Sao
+    Paulo and `zurich` finds Zurich. Someone looking up an airport types on
+    whatever keyboard they have, and a city whose accents they cannot spell is
+    exactly the one they need the search for.
 
-    The table is explicit rather than derived from Unicode normalisation. NFD
-    plus a combining-mark filter would cover most of it, but it comes from an
-    optional package and it does not decompose the letters that are not an
-    ASCII letter with a mark on top -- o-slash, ash, eth, thorn, dotless i,
-    l-stroke. Those need a table anyway, so there is one table rather than a
-    normalisation pass and a table of exceptions to it.
+    The table below is written out rather than derived from Unicode
+    normalisation. NFD plus a combining-mark filter would cover most of it, but
+    it comes from an optional package, and it does not decompose the letters
+    that are not just an ASCII letter with a mark on top: o-slash, ash, eth,
+    thorn, dotless i, l-stroke. Those need a table either way, so there is one
+    table rather than a normalisation pass plus a table of exceptions to it.
 
-    test/test_geo.pl asserts that this covers every character in the generated
-    airport table, so regenerating that table with a new letter in it fails the
-    suite rather than quietly dropping a city out of reach of the search.
+    test/test_geo.pl checks that this covers every character in the generated
+    airport table. Regenerating that table with a new letter in it therefore
+    fails the suite, instead of quietly putting a city out of reach of search.
 */
 
 :- encoding(utf8).
 
 %! fold_diacritics(+Text, -Folded) is det.
-%  Lower-cases and strips accents. Characters with no entry pass through, which
-%  keeps the predicate total: an unfoldable letter simply matches itself.
+%  Lower-cases the text and strips accents. A character with no entry passes
+%  through unchanged, which keeps the predicate total: a letter it cannot fold
+%  just matches itself.
 fold_diacritics(Text, Folded) :-
     downcase_atom(Text, Lower),
     atom_codes(Lower, Codes),
@@ -39,8 +40,8 @@ fold_code(Code, Out, Tail) :-
     ).
 
 %! fold_char(?Code, ?Ascii) is nondet.
-%  101 letters: every non-ASCII character in the airport table,
-%  plus the common European letters someone might type that it happens not
+%  101 letters. That is every non-ASCII character in the airport table, plus
+%  the common European letters someone might type that the table happens not
 %  to contain.
 fold_char(0'À, "A").
 fold_char(0'Á, "A").

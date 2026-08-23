@@ -2,10 +2,10 @@
 
 /** <module> JSON itinerary -> canonical itinerary term.
 
-    Malformed input throws input_error(Message); the caller turns that into an
-    HTTP 400 or a CLI exit code. Input that is well-formed but references
-    something unresolvable is *not* thrown -- itinerary.pl turns that into an
-    ordinary violation so it appears in the report alongside the rule
+    Malformed input throws input_error(Message), and the caller turns that into
+    an HTTP 400 or a CLI exit code. Input that is well formed but names
+    something we cannot resolve does *not* throw. itinerary.pl turns that into
+    an ordinary violation, so it appears in the report beside the rule
     violations.
 */
 
@@ -23,8 +23,8 @@
 %                     "flight": "BA117",
 %                     "dep": "2026-09-01T10:25", "arr": "2026-09-01T13:30" } ] }
 %
-%  Alternatively the whole routing may be given as one fare-construction
-%  string, which is the natural input when there are no dates:
+%  The whole routing can be given instead as one fare-construction string, which
+%  is the natural input when there are no dates:
 %
 %   { "route": "NYC-X/LON-SIN-X/HKG-NYC", "cabin": "business" }
 %
@@ -60,13 +60,13 @@ itinerary_from_json(Dict, Itin) :-
 %
 %   "members": { "qff": { "tier": "gold" } }
 %
-% A bare string is accepted for the same value, because the object exists only
-% to leave room for a membership number nobody has asked for yet.
+% A bare string is accepted for the same value. The object form exists only to
+% leave room for a membership number nobody has asked for yet.
 %
 % No fare rule reads this. It is here because a tier changes what a journey
-% earns, and the programme ids and tier names are the earning side's to check --
-% this reader deliberately does not know them, so an unknown one is refused by
-% the programme that owns it rather than by a list kept here that would go out
+% earns. The programme ids and tier names are the earning side's to check, and
+% this reader does not know them on purpose. An unknown one is then refused by
+% the programme that owns it, rather than by a list kept here that would go out
 % of date.
 members(Dict, Members) :-
     (   get_dict(members, Dict, M), M \== null
@@ -89,8 +89,8 @@ member_tier(Id-Value, Id-Tier) :-
     ;   to_atom(tier, Value, Tier)
     ).
 
-% One of the two forms, never both: a route string and a segment array that
-% disagreed would leave no principled way to choose between them.
+% One of the two forms, never both. If a route string and a segment array
+% disagreed, there would be no principled way to pick between them.
 raw_segments(Dict, RawSegs, DefaultMode) :-
     has_field(Dict, segments, HasSegments),
     has_field(Dict, route, HasRoute),
@@ -129,9 +129,9 @@ mode(Dict, Default, Mode) :-
         throw(input_error(Msg))
     ).
 
-% Routing mode means "this itinerary has no calendar". Quietly discarding
+% Routing mode means "this itinerary has no calendar". Quietly throwing away
 % times supplied alongside it would make the two rules that need them look
-% unanswerable when the data to answer them was right there.
+% unanswerable, when the data to answer them was sitting right there.
 check_times_against_mode(routing, RawSegs) :- !,
     (   member(rseg(_, _, _, _, _, _, _, Dep, Arr, _, _, _), RawSegs),
         ( Dep \== unknown ; Arr \== unknown )
@@ -148,10 +148,10 @@ segment(J, rseg(N, Type, From, To, Mkt, Op, Flight, Dep, Arr, Stop, Class, Famil
     segment_type(J, Type),
     required_atom(J, from, From),
     required_atom(J, to, To),
-    % `carrier` is shorthand for "same carrier both ways" and so fills both
+    % `carrier` is shorthand for "same carrier both ways", so it fills both
     % fields. `marketingCarrier` on its own leaves the operator unknown rather
-    % than assuming there is no codeshare -- 4(j) turns on who actually
-    % operates, and quietly guessing would report a clean 4(j) it never checked.
+    % than assuming there is no codeshare. 4(j) turns on who actually operates,
+    % and a quiet guess would report a clean 4(j) that was never checked.
     atom_field(J, carrier, unknown, Shared),
     atom_field(J, marketingCarrier, Shared, Mkt),
     atom_field(J, operatingCarrier, Shared, Op),
@@ -162,19 +162,20 @@ segment(J, rseg(N, Type, From, To, Mkt, Op, Flight, Dep, Arr, Stop, Class, Famil
     booking_class(J, Class),
     fare_family(J, Family).
 
-% The branded fare the segment was sold under. Optional, programme-interpreted,
-% and read by no fare rule: Rule 3015 has nothing to say about a carrier's fare
-% families. It is here because at least one loyalty programme cannot price a
-% sector without it -- Cathay lists the same economy booking classes under Flex,
-% Essential and Light with different earn against each, so the class does not
-% imply the family and there is nothing to derive one from.
+% The branded fare the segment was sold under. It is optional, each programme
+% reads it its own way, and no fare rule reads it at all: Rule 3015 says nothing
+% about a carrier's fare families. It is here because at least one loyalty
+% programme cannot price a sector without it. Cathay lists the same economy
+% booking classes under Flex, Essential and Light with a different earn against
+% each, so the class does not imply the family and there is nothing to work one
+% out from.
 fare_family(J, Family) :-
     atom_field(J, fareFamily, unknown, Family).
 
-% The class the segment is booked in -- one RBD letter, which is what section
-% 5(b) is written in. Optional: an itinerary that does not carry one still
-% answers every other rule, and 5(b) reports that it had nothing to read rather
-% than guessing a class from the cabin.
+% The class the segment is booked in: one RBD letter, which is what section 5(b)
+% is written in. It is optional. An itinerary without one still answers every
+% other rule, and 5(b) reports that it had nothing to read rather than guessing
+% a class from the cabin.
 booking_class(J, Class) :-
     atom_field(J, bookingClass, unknown, C),
     (   C == unknown
@@ -188,11 +189,11 @@ booking_class(J, Class) :-
         throw(input_error(M))
     ).
 
-% What kind of point the segment arrives at, when the traveller knows it
-% independently of any clock. `layover` and `connection` are the words people
-% actually use for a transfer, so they are accepted rather than rejected on a
-% vocabulary technicality. On the final segment there is no intermediate point
-% to describe and the value is ignored.
+% What kind of point the segment arrives at, when the traveller knows it without
+% looking at a clock. `layover` and `connection` are the words people actually
+% use for a transfer, so they are accepted rather than rejected over vocabulary.
+% On the final segment there is no intermediate point to describe, so the value
+% is ignored.
 stop(J, Stop) :-
     atom_field(J, stop, unknown, S),
     (   S == unknown       -> Stop = unknown
@@ -250,7 +251,8 @@ atom_field(J, Key, Default, Value) :-
     ).
 
 % Airport codes, carriers and cabins are matched against lower-case tables, so
-% they are folded; a flight number is only ever displayed, so it is not.
+% they are folded to lower case. A flight number is only ever displayed, so it
+% is left alone.
 verbatim_field(J, Key, Default, Value) :-
     (   get_dict(Key, J, Raw), Raw \== null
     ->  (   atom(Raw)   -> Value = Raw
@@ -298,10 +300,10 @@ time_field(J, Key, Dt) :-
 
 %! parse_dt(+Text, -Dt) is semidet.
 %
-%  Accepts YYYY-MM-DD, YYYY-MM-DDThh:mm and YYYY-MM-DDThh:mm:ss, with a space
-%  in place of the T. A trailing zone designator is accepted and *discarded*:
-%  these are local wall-clock times by definition (see the timezone note in
-%  itinerary.pl), so honouring an offset here would corrupt ground times.
+%  Accepts YYYY-MM-DD, YYYY-MM-DDThh:mm and YYYY-MM-DDThh:mm:ss, with a space in
+%  place of the T. A trailing zone designator is accepted and then *thrown away*.
+%  These are local wall-clock times by definition -- see the timezone note in
+%  itinerary.pl -- so honouring an offset here would corrupt ground times.
 parse_dt(Raw, dt(Y, Mo, D, H, Mi)) :-
     text_to_string(Raw, S0),
     split_string(S0, "Tt ", "", Parts),
@@ -319,8 +321,8 @@ parse_dt(Raw, dt(Y, Mo, D, H, Mi)) :-
     ;   H = 0, Mi = 0
     ).
 
-% Keep the leading digits and colons and drop whatever zone designator
-% follows, so "10:25Z", "10:25:00" and "10:25-05:00" all read as 10:25.
+% Keep the leading digits and colons, and drop whatever zone designator follows.
+% So "10:25Z", "10:25:00" and "10:25-05:00" all read as 10:25.
 clock_prefix(S0, S) :-
     string_codes(S0, Cs),
     clock_codes(Cs, Kept),

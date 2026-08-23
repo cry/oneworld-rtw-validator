@@ -3,45 +3,45 @@
 /** <module> The class an Explorer fare is sold in, when the itinerary did not say.
 
     An itinerary that names a cabin has said more than it looks like it has.
-    Section 5(b) publishes, per carrier, the class an Explorer fare books into in
-    each cabin, so "business on CX" is `D` and not a question. Every earning
-    table is read against a class; without this, an itinerary written as a
-    routing was unpriceable in both programmes, which is a worse answer than the
-    one the tariff already contains.
+    Section 5(b) publishes, for each carrier, the class an Explorer fare books
+    into in each cabin, so "business on CX" is `D` rather than a question. Every
+    earning table is read against a class. Without this file, an itinerary
+    written as a routing could not be priced in either programme, which is a
+    worse answer than the one the tariff already contains.
 
-    Four things about it are deliberate.
+    Four things about it are on purpose.
 
-    *The applicable codes only.* 5(b)'s notes also permit a lower cabin's own
-    code, `Y` on a First fare and `B` or `H` on a DONE Business fare -- but every
+    *Only the applicable codes.* 5(b)'s notes also allow a lower cabin's own
+    code, `Y` on a First fare, and `B` or `H` on a DONE Business fare. But every
     one of those turns on what the *flight* offers, which an itinerary cannot
-    show. Presuming one would be guessing at a seat map; presuming the applicable
-    code is reading the fare.
+    show. Presuming one of them would be guessing at a seat map. Presuming the
+    applicable code is reading the fare.
 
     *The fare basis narrows it further, and has to.* 5(b) publishes two business
     columns, headed "Business — DONE*" and "Business — IONE3". Those are fare
-    bases and not cabins: a DONE4 fare books into the DONE column, and the IONE3
+    bases, not cabins: a DONE4 fare books into the DONE column, and the IONE3
     column describes a fare this itinerary is not. Asking for the cabin's columns
-    instead returns both codes -- `D` and `I` on most carriers -- and on Qantas'
-    own earning table those two sit in *different* categories, Business and
-    Discount Business. The result was a sector reported undecided over an
-    ambiguity the fare basis printed at the top of the same report had already
-    settled. So the basis picks the column, and only where the itinerary has no
-    published basis at all does the cabin's wider projection stand in.
+    instead returns both codes, `D` and `I` on most carriers, and on Qantas' own
+    earning table those two sit in *different* categories: Business and Discount
+    Business. The result was a sector reported undecided over an ambiguity the
+    fare basis at the top of the same report had already settled. So the basis
+    picks the column, and the cabin's wider projection stands in only where the
+    itinerary has no published basis at all.
 
-    *Economy comes out as `L`, not `Y`.* `Y` is the conventional shorthand for an
-    economy cabin and it is not what this fare books into: 5(b) puts an economy
+    *Economy comes out as `L`, not `Y`.* `Y` is the usual shorthand for an
+    economy cabin, and it is not what this fare books into: 5(b) puts an economy
     Explorer fare in `L` on every carrier that publishes a row. The difference is
-    not cosmetic -- on Cathay metal `L` is the M,L,V group and `Y` is the top one,
+    not cosmetic. On Cathay metal `L` is the M,L,V group and `Y` is the top one,
     and on the Qantas table `L` is Discount Economy where `Y` is Flexible
-    Economy, so presuming `Y` would overstate the earn by roughly double. Wrong
-    high is the bad direction for an estimate.
+    Economy. Presuming `Y` would therefore overstate the earn by roughly double,
+    and too high is the bad direction for an estimate to be wrong in.
 
-    *It never reaches rule 5(b).* The rule checks the class that was booked, and
+    *It never reaches rule 5(b).* That rule checks the class that was booked, and
     a presumed class would let it report a pass it never checked. This is the
-    earning side reading the tariff to fill a gap in an estimate, which is a
-    different thing from a validator inventing evidence. The rule keeps the
-    cabin's projection for the same reason: a ticket presented in either business
-    column is booked in a code 5(b) names, whatever basis this validator reports.
+    earning side reading the tariff to fill a gap in an estimate, which is not
+    the same as a validator inventing evidence. The rule keeps the cabin's
+    projection for the same reason: a ticket presented in either business column
+    is booked in a code 5(b) names, whatever basis this validator reports.
 */
 
 :- use_module('../../data/booking_codes').
@@ -52,8 +52,8 @@
 :- use_module(library(yall)).
 
 %! presumed_classes(+S, +A, -Classes) is det.
-%  Empty when the marketing carrier is unknown or 5(b) publishes no row for it,
-%  which leaves the sector undecided rather than presumed.
+%  Empty when the marketing carrier is unknown, or when 5(b) publishes no row
+%  for it. The sector is then left undecided rather than presumed.
 presumed_classes(S, A, Classes) :-
     Carrier = S.marketing,
     (   Carrier \== unknown,
@@ -67,18 +67,18 @@ presumed_classes(S, A, Classes) :-
     ).
 
 %! reported_basis(+A, -Basis) is semidet.
-%  The fare basis this report prints, and fails where there is none -- fewer
-%  than three continents has no published basis, and rule 0 raises that as an
-%  error rather than this quietly presuming a column.
+%  The fare basis this report prints. It fails where there is none: fewer than
+%  three continents has no published basis, and rule 0 raises that as an error
+%  rather than letting this file quietly presume a column.
 reported_basis(A, Basis) :-
     continent_count(A, _, N),
     fare_basis(A.cabin, N, Basis).
 
 %! presumption(+A, +Classes, -Reason) is det.
 %  What the register says in place of a class the traveller gave. It names the
-%  codes and the fare they were read off rather than the conclusion, so a reader
-%  who knows the fare can see at once whether the presumption is the one they
-%  would have made.
+%  codes and the fare they were read off, rather than just the conclusion, so a
+%  reader who knows the fare can see at once whether this is the presumption
+%  they would have made.
 presumption(A, Classes, Reason) :-
     maplist([C, U]>>upcase_atom(C, U), Classes, Upper),
     atomic_list_concat(Upper, ' or ', List),

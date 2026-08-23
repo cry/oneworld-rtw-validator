@@ -42,16 +42,16 @@ eligible_carriers(Cs) :- findall(C, eligible_carrier(C), Cs0), sort(Cs0, Cs).
 
 %! ticketing_stock(?Carrier) is nondet.
 %  Section 15: "Tickets must be issued on the stock of
-%  AA/AS/AT/AY/BA/CX/FJ/IB/JL/MH/QF/QR/RJ/UL/WY." That is fifteen of the
-%  sixteen eligible carriers; the one it omits is NU, which may be flown under
-%  4(j) but may not issue the ticket.
+%  AA/AS/AT/AY/BA/CX/FJ/IB/JL/MH/QF/QR/RJ/UL/WY." That is fifteen of the sixteen
+%  eligible carriers. The one left out is NU, which may be flown under 4(j) but
+%  may not issue the ticket.
 ticketing_stock(C) :- eligible_carrier(C), C \== nu.
 
 %! affiliate(?Parent, ?Code, ?Name) is nondet.
-%  4(j) permits travel on these affiliated airlines. Only affiliates with their
-%  own IATA designator are listed: those that operate under the parent's code
-%  (BA Euroflyer, Fiji Link, the QantasLink operators, Royal Air Maroc Express)
-%  are already covered by eligible_carrier/1 on the operating field.
+%  4(j) allows travel on these affiliated airlines. Only affiliates with their
+%  own IATA designator are listed here. Those that fly under the parent's code
+%  -- BA Euroflyer, Fiji Link, the QantasLink operators, Royal Air Maroc Express
+%  -- are already covered by eligible_carrier/1 on the operating field.
 affiliate(as, qx, 'Horizon Air').
 affiliate(as, oo, 'SkyWest Airlines').
 affiliate(aa, mq, 'Envoy Air').
@@ -68,10 +68,10 @@ affiliate(jl, hac, 'Hokkaido Air System').
 affiliate(jl, jc, 'Japan Air Commuter').
 
 %! carrier_code(?Code) is nondet.
-%  Every code a routing may legitimately name in carrier position: the eligible
-%  carriers, the 4(j) affiliates, and the two QF operators named as exceptions.
-%  Most are two characters; a few affiliates are three, which is why io/route_in
-%  cannot tell carriers from places by length alone.
+%  Every code a routing may name in carrier position: the eligible carriers, the
+%  4(j) affiliates, and the two QF operators named as exceptions. Most are two
+%  characters. A few affiliates are three, which is why io/route_in cannot tell
+%  carriers from places by length alone.
 carrier_code(C) :- eligible_carrier(C).
 carrier_code(C) :- affiliate(_, C, _).
 carrier_code(jq).

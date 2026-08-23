@@ -3,13 +3,13 @@
 /** <module> Earn report -> JSON dict.
 
     The kernel already builds dicts, so this is nearly a pass-through. It exists
-    for the one thing that is not: an amount can be `none` or `indeterminate`,
+    for the one thing that is not. An amount can be `none` or `indeterminate`,
     and neither may reach a JSON consumer as a number.
 
-    Both become `null`, with `known` saying which of the two it was. A client
-    that renders `value` and ignores `known` prints a blank rather than a zero,
-    which is the failure this shape is chosen to make impossible -- a `0` in a
-    points column is a claim, and it is the wrong one in both cases.
+    Both become `null`, and `known` says which of the two it was. A client that
+    renders `value` and ignores `known` then prints a blank rather than a zero.
+    That is the failure this shape is chosen to make impossible: a `0` in a
+    points column is a claim, and it is the wrong claim in both cases.
 */
 
 :- use_module('../earn/kernel').
@@ -72,20 +72,21 @@ amount_json(A, _{ currency: Key, value: Value, known: Known,
     ;   Base = null
     ).
 
-% Four states, and a client that renders `value` alone must not be able to
-% mistake any of the three that are not a number for one. `none` is a rate the
-% table publishes as nothing, `unknown` is a rate nobody stated, and `range` is
-% two rates the input could not choose between -- each of which a 0 would
-% misreport, and each differently.
+% There are four states, and a client that renders `value` alone must not be
+% able to mistake any of the three non-numbers for a number. `none` is a rate
+% the table publishes as nothing. `unknown` is a rate nobody stated. `range` is
+% two rates the input could not choose between. A 0 would misreport all three,
+% and would misreport each of them differently.
 known_value(none,          null, published_as_none, null, null) :- !.
 known_value(indeterminate, null, unknown,           null, null) :- !.
 known_value(range(L, H),   null, range,             L,    H) :- !.
 known_value(V,             V,    known,             V,    V).
 
 %! programs_json(-Dict) is det.
-%  Everything a client would otherwise have to hardcode about the programmes,
-%  for the same reason /api/ruleset exists: the page names no programme, no
-%  currency and no tier of its own, so it cannot drift from the tables.
+%  Everything a client would otherwise have to hardcode about the programmes.
+%  This exists for the same reason /api/ruleset does: the page names no
+%  programme, no currency and no tier of its own, so it cannot drift from the
+%  tables.
 programs_json(_{ programs: Programs }) :-
     earn_programs(Ids),
     maplist(program_summary, Ids, Programs).

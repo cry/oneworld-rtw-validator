@@ -12,15 +12,15 @@
 
 /** <module> The derived-facts pass.
 
-    annotate/2 runs once, before any rule, and decorates the raw itinerary with
-    everything the rules need: continents, traffic conferences, ocean
-    crossings, and the stopover/transfer classification of every intermediate
-    point. Without it roughly twenty-five rules would each re-derive the same
-    geography; with it, most rule bodies stay two or three goals long.
+    annotate/2 runs once, before any rule, and adds to the raw itinerary
+    everything the rules need: continents, traffic conferences, ocean crossings,
+    and whether each intermediate point is a stopover or a transfer. Without it,
+    some twenty-five rules would each work out the same geography again. With
+    it, most rule bodies are two or three goals long.
 
-    It is eager and pure -- it returns a term, asserts nothing, and tables
-    nothing -- which is what makes the validator safe to call concurrently from
-    HTTP worker threads.
+    It is eager and pure. It returns a term, asserts nothing and tables nothing,
+    which is what makes the validator safe to call from several HTTP worker
+    threads at once.
 */
 
 :- use_module(geo).
@@ -69,9 +69,9 @@ annotate_segment(S, A) :-
               international: Intl,
               ocean: Ocean }.
 
-% An unresolvable airport yields `unknown` fields rather than a failure, so an
+% An airport we cannot resolve gives `unknown` fields instead of failing, so an
 % itinerary with one bad code still gets validated everywhere else. Every rule
-% that reads a geography field requires it to be bound to a real value.
+% that reads a geography field insists on a real value first.
 geo_of(A, Country, Region, Cont, Zone, TC) :-
     (   airport_known(A)
     ->  airport_country(A, Country),
@@ -105,9 +105,9 @@ international(_, _, _, _, true).
 
 % --- intermediate points ---------------------------------------------------
 
-% A point exists between each consecutive pair of segments. The origin (before
-% segment 1) and the final return (after segment N) are not intermediate
-% points and can never be stopovers.
+% There is a point between each pair of consecutive segments. The origin
+% (before segment 1) and the final arrival (after segment N) are not
+% intermediate points, so they can never be stopovers.
 points(Segs, Points) :-
     findall(P, point(Segs, P), Points).
 
@@ -136,24 +136,25 @@ surface_adjacent(A, B, Surface) :-
     ).
 
 %! declared_kind(+ArrivingSegment, -Kind) is det.
-%  What the traveller said about the point this segment arrives at -- the
-%  `X/` of fare-construction notation, or the `stop` field of a JSON segment.
+%  What the traveller said about the point this segment arrives at: either the
+%  `X/` of fare-construction notation, or a JSON segment's `stop` field.
 declared_kind(A, Kind) :-
     (   stop_kind(A.stop)
     ->  Kind = A.stop
     ;   Kind = unknown
     ).
 
-% Convention, since Rule 3015 never defines stopover-vs-transfer:
+% Rule 3015 never says what separates a stopover from a transfer, so this is our
+% convention:
 %
-%   * A point adjacent to a surface sector is a stopover -- surface travel is
-%     at the passenger's expense (4(g)) and breaks the flown journey.
-%   * Otherwise more than 24 hours on the ground, or more than 4 hours where
-%     both adjacent sectors are domestic within the USA/Canada.
-%   * With no timestamps this is `indeterminate`, which propagates into rule 8
-%     as an `indeterminate` violation rather than a silent pass.
+%   * A point next to a surface sector is a stopover. Surface travel is at the
+%     passenger's expense (4(g)) and breaks the flown journey.
+%   * Otherwise, more than 24 hours on the ground. The limit drops to 4 hours
+%     when both neighbouring sectors are domestic within the USA or Canada.
+%   * With no timestamps the answer is `indeterminate`. That carries through to
+%     rule 8 as an `indeterminate` violation rather than a quiet pass.
 %
-% Both thresholds live in data/limits.pl so they are auditable.
+% Both thresholds live in data/limits.pl, where they can be audited.
 derived_kind(_, _, _, _, true, stopover) :- !.
 derived_kind(_, _, _, unknown, _, indeterminate) :- !.
 derived_kind(A, B, Airport, Mins, _, Kind) :-
@@ -163,11 +164,11 @@ derived_kind(A, B, Airport, Mins, _, Kind) :-
 
 %! effective_kind(+Surface, +Declared, +Derived, -Kind) is det.
 %
-%  A declaration beats the clock: the traveller knows what was booked, and a
-%  routing-only itinerary has no clock to read. It does not beat a surface
-%  sector, because 4(g) surface travel is at the passenger's own expense and
-%  breaks the flown journey whatever it is called. Where the two disagree the
-%  disagreement is reported by rule 8 rather than resolved in silence.
+%  A declaration beats the clock. The traveller knows what was booked, and a
+%  routing-only itinerary has no clock to read anyway. A declaration does not
+%  beat a surface sector: 4(g) surface travel is at the passenger's own expense
+%  and breaks the flown journey whatever anyone calls it. When the two disagree,
+%  rule 8 reports the disagreement rather than settling it quietly.
 effective_kind(true, _, Derived, Derived) :- !.
 effective_kind(_, unknown, Derived, Derived) :- !.
 effective_kind(_, Declared, _, Declared).
@@ -198,9 +199,9 @@ raw_sequence(Segs, FromKey, ToKey, Raw) :-
     append(Froms, [End], Raw).
 
 %! collapse(+List, -Collapsed) is det.
-%  Removes consecutive duplicates. This is what turns a 12-segment itinerary
-%  into the short traffic-conference cycle that 4(a)/4(b)/4(c) are checked
-%  against.
+%  Drops repeats that sit next to each other. This is what turns a 12-segment
+%  itinerary into the short traffic-conference cycle that 4(a), 4(b) and 4(c)
+%  are checked against.
 collapse([], []).
 collapse([X], [X]) :- !.
 collapse([X, X|T], R) :- !, collapse([X|T], R).
@@ -218,8 +219,8 @@ visited_set(Segs, Visited) :-
 ann_seg(A, S) :- member(S, A.segments).
 
 %! ann_flight(+A, -N, -From, -To) is nondet.
-%  Flight segments only; surface sectors are excluded because 4(i) and the
-%  4(h) free-segment caps are about flights.
+%  Flight segments only. Surface sectors are left out because 4(i) and the 4(h)
+%  free-segment caps are about flights.
 ann_flight(A, N, From, To) :-
     ann_seg(A, S),
     S.type == flight,
@@ -228,9 +229,9 @@ ann_flight(A, N, From, To) :-
 ann_point(A, P) :- member(P, A.points).
 
 %! ann_airport(+A, -Airport) is nondet.
-%  Each distinct point of the journey, once. Rules that ask "does the
-%  itinerary include X" must use this rather than iterating segments, or a
-%  single airport appearing as both an arrival and the next departure reports
+%  Each distinct point of the journey, once. A rule that asks "does the
+%  itinerary include X" must use this instead of walking the segments.
+%  Otherwise an airport that is both an arrival and the next departure reports
 %  its violation twice.
 ann_airport(A, Airport) :-
     findall(P, ( ann_seg(A, S), ( P = S.from ; P = S.to ) ), Ps),
@@ -240,27 +241,27 @@ ann_airport(A, Airport) :-
 ann_visits(A, C) :- memberchk(C, A.visited).
 
 %! ann_segment_count(+A, -N) is det.
-%  Every segment the itinerary lists, and nothing else. The
-%  origin-destination gap is *not* counted, though 4(h) does say "including
-%  surface segments between any 2 airports" and the gap is between 2 airports.
+%  Every segment the itinerary lists, and nothing else. The origin-destination
+%  gap is *not* counted, even though 4(h) says "including surface segments
+%  between any 2 airports" and the gap does sit between 2 airports.
 %
 %  It was counted here for a while, on that reading. What settles it the other
-%  way is what the reading costs: 4(c) permits the journey to end away from the
-%  origin, and nothing in 4(c) or 4(h) says taking that permission also costs a
-%  segment. Counting the gap caps an open-jaw journey at 15 flights while a
-%  closed loop gets 16 -- a real penalty derived from a clause that never
-%  mentions open jaws. The surface segments 4(h) has in view are 4(g)'s
-%  intermediate ones, which are sectors of the journey; the gap is the part of
-%  the world the ticket deliberately does not cover.
+%  way is the price of that reading. 4(c) lets the journey end away from the
+%  origin, and neither 4(c) nor 4(h) says that taking the permission also costs
+%  a segment. Counting the gap would cap an open-jaw journey at 15 flights while
+%  a closed loop gets 16 -- a real penalty pulled out of a clause that never
+%  mentions open jaws. The surface segments 4(h) is talking about are 4(g)'s
+%  intermediate ones, which are sectors of the journey. The gap is the part of
+%  the world the ticket deliberately leaves out.
 %
-%  Held itineraries agree: a 16-flight CAI-...-DOH with a 4(c)(b) Middle East
-%  open jaw prices, and it cannot if the gap counts.
+%  Real tickets agree. A 16-flight CAI-...-DOH with a 4(c)(b) Middle East open
+%  jaw prices, and it could not if the gap counted.
 %
-%  The gap is still reported -- see r04's free-segment check and od_gap_clause/2
-%  -- because a traveller reading a count of 16 should know which 16.
+%  The gap is still reported, by r04's free-segment check and od_gap_clause/2,
+%  because a traveller reading a count of 16 should be able to see which 16.
 %
-%  Two airports of one metropolitan city are one point, so LHR out and LGW back
-%  is not a gap; see geo:place_key/2.
+%  Two airports of one metropolitan city count as one point, so LHR out and LGW
+%  back is not a gap. See geo:place_key/2.
 ann_segment_count(A, N) :-
     length(A.segments, N).
 

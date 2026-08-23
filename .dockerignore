@@ -1,5 +1,5 @@
-# Everything the image does not need. The COPY lines in the Dockerfile are
-# explicit, so this is defence in depth plus a smaller build context.
+# Everything the image does not need. The Dockerfile's COPY lines name what they
+# want, so this is defence in depth plus a smaller build context.
 .git
 .gitignore
 .claude
@@ -15,9 +15,10 @@ httpd.log
 
 # The UI toolchain. web/app.css, web/map.js, web/rtw.pvm and web/vendor/ are all
 # generated and committed, so the image carries the outputs and never needs the
-# inputs, the compilers, or node. web/fonts/NOTICE.md and OFL.txt are
-# deliberately NOT excluded: the licence requires them to travel with the fonts,
-# and neither is web/vendor/ -- the page loads the Prolog engine from there.
+# inputs, the compilers, or node. Two things are NOT excluded, on purpose:
+# web/fonts/NOTICE.md and OFL.txt, because the licence requires them to travel
+# with the fonts, and web/vendor/, because the page loads the Prolog engine from
+# there.
 node_modules
 package.json
 package-lock.json
@@ -27,7 +28,7 @@ web/map.src.js
 web/check-contrast.mjs
 web/rtw.build.json
 
-# The raw earning-table captures are the generators' input, not the validator's.
-# The .pl files built from them are what gets loaded, and those are committed
-# alongside; see prolog/data/earn/sources/README.md.
+# The raw earning-table captures are input for the generators, not for the
+# validator. What gets loaded is the .pl files built from them, and those are
+# committed alongside. See prolog/data/earn/sources/README.md.
 prolog/data/earn/sources

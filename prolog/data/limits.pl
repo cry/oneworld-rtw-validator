@@ -12,9 +12,9 @@
 
 /** <module> Versioned numeric caps and tables from Rule 3015.
 
-    No rule clause anywhere may hardcode a number; each one reads it from here.
-    A future edition of the fare is then a change to this file plus tests
-    rather than a rewrite. Citations point at parsed-rules-aug-2026.md.
+    No rule clause anywhere may hardcode a number. Each one reads it from here.
+    A future edition of the fare is then a change to this file plus its tests,
+    rather than a rewrite. The citations point at parsed-rules-aug-2026.md.
 */
 
 ruleset_version('27FEB26').
@@ -44,28 +44,28 @@ limit(infant_discount_percent,         10).   % 19
 limit(child_min_age,                    2).   % 19
 limit(child_max_age,                   11).   % 19
 
-% Service limits. Not from the fare rule: these bound the work a single request
-% can cause. Several rules are quadratic in the segment count (4(i) compares
-% every pair), so the input is capped well above the 16 the fare permits but far
-% below anything that could be used to make the validator spin.
+% Service limits. These do not come from the fare rule. They bound the work a
+% single request can cause. Several rules are quadratic in the segment count --
+% 4(i) compares every pair -- so the input is capped well above the 16 the fare
+% allows, and far below anything that could make the validator spin.
 limit(max_input_segments,             100).
 limit(max_request_bytes,           131072).
 limit(request_time_limit_seconds,      10).
 
-% Validation runs in its own thread pool so that slow requests cannot starve
-% the cheap endpoints -- see the note in server.pl. A full backlog is refused
-% with 503 rather than queued without bound.
+% Validation runs in its own thread pool, so slow requests cannot starve the
+% cheap endpoints -- see the note in server.pl. A full backlog is refused with a
+% 503 rather than queued without limit.
 limit(validate_workers,                 8).
 limit(validate_backlog,                64).
 
-% Local wall-clock arithmetic: see the date line note in src/itinerary.pl. The
+% Local wall-clock arithmetic; see the date line note in src/itinerary.pl. The
 % span from UTC+14 to UTC-12 is 26 hours, so a sector whose arrival clock time
-% precedes its departure by more than that cannot be a date line crossing.
+% comes more than that before its departure cannot be a date line crossing.
 limit(max_local_time_regression_hours, 26).
 
-% Stopover thresholds. The fare rule never defines stopover-vs-transfer; these
-% are the industry convention and are declared here so they are auditable and
-% adjustable rather than buried in annotate.pl.
+% Stopover thresholds. The fare rule never says what separates a stopover from a
+% transfer. These are the industry convention, and they are declared here so
+% they can be audited and adjusted rather than buried in annotate.pl.
 limit(stopover_hours_international,    24).
 limit(stopover_hours_domestic_us_ca,    4).
 
@@ -79,8 +79,8 @@ free_segments(south_america,       4).
 free_segments(south_west_pacific,  4).
 
 %! fare_basis(?Cabin, ?Continents, ?Basis) is nondet.
-%  Section 0. IONE3 is offered from select markets only, so DONE3 is the
-%  fare basis reported for 3-continent business.
+%  Section 0. IONE3 is offered in select markets only, so DONE3 is the fare
+%  basis reported for 3-continent business.
 fare_basis(economy,  3, 'LONE3').
 fare_basis(economy,  4, 'LONE4').
 fare_basis(economy,  5, 'LONE5').
@@ -99,10 +99,10 @@ continent(C) :- free_segments(C, _).
 
 %! continent_name(?Continent, ?Name) is nondet.
 %  How a continent is written for a reader. The atoms are table keys and read
-%  like table keys; nobody outside the program calls a place `south_west_pacific`.
-%  Rule 3015 writes the second one "Europe/Middle East", which is a slash doing
-%  the work of a conjunction; spelled out it cannot be misread as a choice
-%  between the two.
+%  like table keys; nobody outside the program calls a place
+%  `south_west_pacific`. Rule 3015 writes the second one as "Europe/Middle
+%  East", where the slash does the work of "and". Spelled out, it cannot be
+%  misread as a choice between the two.
 continent_name(north_america,      'North America').
 continent_name(south_america,      'South America').
 continent_name(europe_middle_east, 'Europe & Middle East').
@@ -117,22 +117,22 @@ tc_name(tc2, 'TC2').
 tc_name(tc3, 'TC3').
 tc_name(unknown, 'an unrecognised region').
 
-% Both tables carry `unknown` so that they are total over the values annotate.pl
-% can actually produce. geo_of/6 yields `unknown` for a point it cannot place,
-% and a rule that renders a sequence containing one -- 4(a)/4(b)'s traffic
-% conference cycle is the case -- would otherwise fail at maplist/3 and take its
-% whole check clause out of the register with it. A check that vanishes is worse
-% than one that reads awkwardly: the report loses a line without saying so.
+% Both tables carry `unknown`, so that they are total over the values annotate.pl
+% can actually produce. geo_of/6 gives `unknown` for a point it cannot place. A
+% rule that renders a sequence containing one -- 4(a)/4(b)'s traffic conference
+% cycle is the case -- would otherwise fail at maplist/3 and take its whole check
+% clause out of the register with it. A check that vanishes is worse than one
+% that reads awkwardly: the report loses a line and never says so.
 %
-% They are deliberately *not* reachable from continent/1, which is what the rules
-% iterate over, so no rule gains a phantom continent from this. The one
-% enumeration that does pick them up is json_out:place_names/1, and it wants
-% them: segment_json/2 already sends `unknown` to the browser as a continent, and
-% until now there was no name for the page to render it with.
+% These entries are *not* reachable from continent/1, which is what the rules
+% iterate over, so no rule picks up a phantom continent from them. The one
+% enumeration that does reach them is json_out:place_names/1, and it wants them:
+% segment_json/2 already sends `unknown` to the browser as a continent, and until
+% now there was no name for the page to render it with.
 
 %! traffic_conference(?Continent, ?TC) is nondet.
-%  Section 0. This mapping is why 4(b) (a TC-level rule) and 4(e) (a
-%  continent-level rule) must not be conflated -- see src/rules/r04_routing.pl.
+%  Section 0. This mapping is why 4(b), a TC-level rule, and 4(e), a
+%  continent-level rule, must not be run together. See src/rules/r04_routing.pl.
 traffic_conference(north_america,      tc1).
 traffic_conference(south_america,      tc1).
 traffic_conference(europe_middle_east, tc2).

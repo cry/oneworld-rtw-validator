@@ -4,34 +4,34 @@
 //
 // The page runs a second Prolog: SWI compiled to WebAssembly, at a different
 // version from the one the container runs. Everything else in the suite checks
-// what the rules mean; this checks that they mean it in both engines, which is
+// what the rules mean. This checks that they mean it in both engines, which is
 // the one property no plunit test can see.
 //
 // Both sides are driven through rtw_call/4, so the comparison covers the whole
 // path a browser takes -- JSON in, itinerary, annotation, every rule, JSON out --
-// rather than a verdict alone. A report is a few thousand characters of message
-// prose, ordering and evidence, and comparing all of it means a rule whose
-// wording or evidence differs between engines fails here rather than being
-// noticed by a reader months later.
+// rather than just the verdict. A report is a few thousand characters of message
+// prose, ordering and evidence. Comparing all of it means a rule whose wording or
+// evidence differs between engines fails here, rather than being noticed by a
+// reader months later.
 //
 // Every fixture goes through every operation that takes an itinerary, so `earn`
-// came along for free the moment it became one: its tables, its distances and
-// its reasons for not being able to price a sector are all compared the same
-// way, and a floating-point difference between the two engines would show up
-// here as a changed mileage band rather than as a wrong number on a page.
+// came along for free the moment it became one. Its tables, its distances and its
+// reasons for not being able to price a sector are all compared the same way, and
+// a floating-point difference between the two engines would show up here as a
+// changed mileage band rather than as a wrong number on a page.
 //
-// The comparison is *structural*, not textual, and that distinction is the whole
-// reason this file has a diff routine in it. SWI moved JSON out of the HTTP
-// package at version 10: on 9.x wasm.pl falls back to library(http/json), which
-// puts a space after a comma where library(json) does not. Comparing the text
-// therefore asserts a property of whichever pretty-printer happened to be
-// present, and CI -- where apt supplies 9.x -- reported all 54 fixtures as
-// differing when not one of them meant anything different. Whitespace between
-// JSON pairs is not a fact about the fare, so it is parsed away before anything
-// is compared. Everything that does carry meaning survives: array order, every
-// message, every piece of evidence, and the presence or absence of every key.
+// The comparison is *structural*, not textual, and that is the whole reason this
+// file has a diff routine in it. SWI moved JSON out of the HTTP package at
+// version 10. On 9.x, wasm.pl falls back to library(http/json), which puts a
+// space after a comma where library(json) does not. Comparing the text therefore
+// asserts a property of whichever pretty-printer happened to be present, and CI
+// -- where apt supplies 9.x -- reported all 54 fixtures as differing when not one
+// of them meant anything different. Whitespace between JSON pairs is not a fact
+// about the fare, so it is parsed away before anything is compared. Everything
+// that does carry meaning survives: array order, every message, every piece of
+// evidence, and the presence or absence of every key.
 //
-// It is the counterpart of the HTTP round-trip test in test_json.pl: same
+// This is the counterpart of the HTTP round-trip test in test_json.pl: same
 // purpose, different second renderer.
 
 import SWIPL from 'swipl-wasm/dist/swipl/swipl-bundle-no-data.js';
@@ -46,8 +46,8 @@ const FIXTURES = path.join(HERE, 'fixtures');
 const IMAGE = path.join(REPO, 'web', 'rtw.pvm');
 
 // One line per fixture per operation: the operation, a slash, the name, a tab,
-// and the reply. width(0) in rtw_call/4 keeps a reply on one line, which is what
-// makes a line-oriented comparison safe -- some of these messages are long
+// then the reply. width(0) in rtw_call/4 keeps each reply on one line, which is
+// what makes a line-by-line comparison safe. Some of these messages are long
 // enough that atom_json_dict would otherwise wrap them.
 const OPS = ['validate', 'earn'];
 
@@ -66,11 +66,11 @@ function fail(message) {
   process.exit(1);
 }
 
-// The first place two replies disagree, as a path into the report. Reports run to
-// a few thousand characters and are identical for most of their length, so the
-// earlier version of this printed 300 characters of agreement and left the reader
-// to find the difference by eye. A path and the two values is what is actually
-// wanted: `violations[0].message` says which rule to go and read.
+// The first place two replies disagree, given as a path into the report. Reports
+// run to a few thousand characters and are identical for most of their length, so
+// the earlier version of this printed 300 characters of agreement and left the
+// reader to spot the difference by eye. A path plus the two values is what is
+// actually wanted: `violations[0].message` says which rule to go and read.
 function firstDifference(a, b, path = '') {
   const here = path || '(root)';
   if (a === null || b === null || typeof a !== 'object' || typeof b !== 'object') {
@@ -89,8 +89,8 @@ function firstDifference(a, b, path = '') {
     }
     return null;
   }
-  // Key order in an object carries no meaning in JSON, and Prolog dicts are held
-  // sorted anyway, so only the set of keys and their values are compared.
+  // Key order in an object means nothing in JSON, and Prolog dicts are held
+  // sorted anyway, so only the set of keys and their values get compared.
   const keys = [...new Set([...Object.keys(a), ...Object.keys(b)])].sort();
   for (const key of keys) {
     if (!(key in a) || !(key in b)) {

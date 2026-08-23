@@ -6,10 +6,10 @@
 
         NYC-X/LON-SIN-X/HKG-NYC
 
-    The notation carries exactly the thing timestamps were being used to infer.
-    `X/` marks a transit point; a point without it is a stopover. So a routing
-    string is a complete input for every rule that does not need a calendar --
-    which is all of them except 6 and 7.
+    The notation states outright what timestamps were being used to guess. `X/`
+    marks a transit point, and a point without it is a stopover. So a routing
+    string is complete input for every rule that does not need a calendar, which
+    is all of them except 6 and 7.
 
     The grammar, with the extensions this validator needs:
 
@@ -24,10 +24,10 @@
         LON X/PAR SIN              whitespace and commas separate as well as
                                    `-`, so pasted routings parse unchanged
 
-    Airport codes and metropolitan city codes are both accepted; data/cities.pl
-    resolves the latter. Length is what tells the token kinds apart -- airline
-    designators are two characters and place codes are three -- so `XIY` is
-    Xi'an rather than a transfer at `IY`, and no escaping is needed.
+    Both airport codes and metropolitan city codes are accepted, and
+    data/cities.pl resolves the city ones. Length tells the token kinds apart:
+    airline designators are two characters and place codes are three. So `XIY`
+    is Xi'an rather than a transfer at `IY`, and nothing needs escaping.
 */
 
 :- use_module('../geo').
@@ -35,15 +35,15 @@
 :- use_module(library(apply)).
 
 %! route_help(-Text) is det.
-%  One-line grammar summary, used by the CLI usage message and served to the
-%  web UI so the syntax is documented in exactly one place.
+%  A one-line summary of the grammar. The CLI usage message uses it and the web
+%  UI is served it, so the syntax is documented in exactly one place.
 route_help('NYC-X/LON-SIN-NYC — points separated by "-", "X/" marks a transfer (anything else is a stopover), "//" makes a leg a surface sector, and a two-letter token between points is that leg\'s carrier.').
 
 %! route_segments(+Text, -RawSegs) is det.
 %
 %  Produces the same rseg/12 terms io/json_in.pl builds from a `segments`
-%  array, so both front ends meet at build_itinerary/7 and no rule knows which
-%  was used. Throws input_error(Message) on anything unparseable.
+%  array. Both front ends therefore meet at build_itinerary/7, and no rule knows
+%  which one was used. Throws input_error(Message) on anything it cannot parse.
 route_segments(Text, RawSegs) :-
     text_to_string(Text, S0),
     string_upper(S0, S1),
@@ -61,8 +61,8 @@ route_segments(Text, RawSegs) :-
 
 % --- tokenizing ------------------------------------------------------------
 
-% `//` becomes a token of its own first, so it survives the split whether it
-% was written as `BKK//SIN` or as `BKK-//-SIN`.
+% `//` is turned into a token of its own first, so it survives the split whether
+% it was written as `BKK//SIN` or as `BKK-//-SIN`.
 tokens(S0, Tokens) :-
     replace_surface(S0, S1),
     split_string(S1, "- \t\n,", "- \t\n,", Parts),
@@ -76,7 +76,7 @@ replace_surface(In, Out) :-
 % --- walking ---------------------------------------------------------------
 
 % Each point records the leg that *arrives* at it, because that is the leg the
-% point's own declaration belongs to: `X/LON` says the point at the end of the
+% point's own declaration belongs to. `X/LON` says the point at the end of the
 % leg into London is a transfer.
 walk([], _, _, []).
 walk(['//'|T], _, Carrier, Points) :- !,
@@ -98,19 +98,19 @@ walk([Token|_], _, _, _) :-
            [Token]),
     throw(input_error(M)).
 
-% Codes are held lower-case internally throughout, matching io/json_in.pl, so
-% they meet the carrier and airport tables in the form those tables use.
+% Codes are stored lower-case throughout, matching io/json_in.pl, so they reach
+% the carrier and airport tables in the form those tables use.
 carrier_token(T, Code) :-
     atom_length(T, 2),
     atom_chars(T, Cs),
     maplist([C]>>char_type(C, alnum), Cs),
     downcase_atom(T, Code).
-% A few 4(j) affiliates carry three-letter designators, so length alone no
-% longer separates carriers from places. A three-letter token is read as a
-% carrier only when it is one and no airport or city answers to it -- which
-% leaves HAC the airport at Hachijojima rather than Hokkaido Air System, since
-% a routing that names a place is the far likelier reading and the notation has
-% no way to say which was meant. io/route_out refuses to compose the other one.
+% A few 4(j) affiliates have three-letter designators, so length alone no longer
+% separates carriers from places. A three-letter token counts as a carrier only
+% when it is one and no airport or city answers to the same code. That leaves HAC
+% as the airport at Hachijojima rather than Hokkaido Air System, because a
+% routing that names a place is by far the likelier reading and the notation has
+% no way to say which was meant. io/route_out refuses to write the other one.
 carrier_token(T, Code) :-
     atom_length(T, 3),
     atom_chars(T, Cs),
@@ -134,10 +134,10 @@ place_code(T, Code) :-
 
 % --- assembling ------------------------------------------------------------
 
-% The declaration on a point describes the point, so it lands on the segment
-% that arrives there. The final point is the end of the journey rather than an
-% intermediate point, so its declaration is dropped rather than carried on a
-% segment where nothing would ever read it.
+% A point's declaration describes that point, so it lands on the segment that
+% arrives there. The final point ends the journey rather than interrupting it,
+% so its declaration is dropped instead of being carried on a segment where
+% nothing would ever read it.
 segments([_], _, []) :- !.
 segments([point(From, _, _, _), Next|Rest], N, [Seg|Segs]) :-
     Next = point(To, Declared, Type, Carrier),
@@ -145,9 +145,9 @@ segments([point(From, _, _, _), Next|Rest], N, [Seg|Segs]) :-
     ->  Stop = unknown
     ;   Stop = Declared
     ),
-    % No booking class and no fare family: a routing is a fare notation and has
-    % no place to write either. Section 5(b) and the earning programmes report
-    % that they had nothing to read -- see PLANS/05.
+    % No booking class and no fare family. A routing is a fare notation with
+    % nowhere to write either one. Section 5(b) and the earning programmes
+    % report that they had nothing to read -- see PLANS/05.
     Seg = rseg(N, Type, From, To, Carrier, Carrier, unknown, unknown, unknown, Stop, unknown, unknown),
     N1 is N + 1,
     segments([Next|Rest], N1, Segs).

@@ -3,18 +3,19 @@
 /* Behaviour for the validator page.
  *
  * Two ways in, one itinerary. The Routing tab sends {route: "..."} and lets the
- * validator parse it; the Segments tab sends {mode, segments: [...]}. Both go
+ * validator parse it. The Segments tab sends {mode, segments: [...]}. Both go
  * through api.js to Prolog compiled to WebAssembly, running in a worker on this
- * machine -- see web/api.js for why there is one backend and not two.
+ * machine. See web/api.js for why there is one backend and not two.
  *
  * The grammar is not implemented here in either direction. Reading a routing is
- * the `validate` operation's job and writing one is `routing`'s, because a copy
+ * the `validate` operation's job, and writing one is `routing`'s, because a copy
  * of the grammar living in the browser would be the one nothing tests. Both
- * directions are Prolog, and the suite asserts that a routing survives the round
+ * directions are Prolog, and the suite checks that a routing survives the round
  * trip.
  *
- * Every class name below is written out in full rather than assembled from pieces,
- * because Tailwind generates CSS by scanning this file for literal strings.
+ * Every class name below is written out in full rather than built up from
+ * pieces, because Tailwind generates CSS by scanning this file for literal
+ * strings.
  */
 
 const EXAMPLES = {
@@ -111,8 +112,8 @@ const PAX = {
   'child':        [{type:'child', age: 7}]
 };
 
-// Colour is looked up, never interpolated, so every class Tailwind must generate
-// appears literally in this file.
+// Colour is looked up, never built from pieces, so every class Tailwind has to
+// generate appears literally in this file.
 const SEV = {
   error:         { noun: 'error',              text: 'text-err',   wash: 'bg-err-wash' },
   warning:       { noun: 'warning',            text: 'text-warn',  wash: 'bg-warn-wash' },
@@ -131,7 +132,7 @@ const KIND = {
   indeterminate: 'text-indet font-semibold'
 };
 
-// The check register. `pass` is deliberately the quietest of the six: on a valid
+// The check register. `pass` is the quietest of the six on purpose: on a valid
 // itinerary it is every row, and colouring them all green would leave nothing
 // for the two that are not. An absence — n/a, not run — is dimmed rather than
 // dressed up as a result.
@@ -156,16 +157,17 @@ let view = 'routing';
 
 const TABS = { routing: 'tab-routing', segments: 'tab-segments' };
 
-// Switching tabs relays out the page: the form goes from a sidebar to the full
-// width and the answer moves from beside it to under it. That is a real change
-// of shape and it is worth animating, but only the browser knows where every
-// panel ended up, so the work is handed to a view transition rather than to a
+// Switching tabs lays the page out again. The form goes from a sidebar to the
+// full width, and the answer moves from beside it to under it. That is a real
+// change of shape and worth animating, but only the browser knows where every
+// panel ended up, so the work goes to a view transition rather than to a
 // hand-written FLIP. Each panel that moves carries a view-transition-name, so
-// what the reader sees is three boxes travelling to their new places instead of
-// a page that blinks into a different arrangement.
+// the reader sees three boxes travelling to their new places instead of a page
+// that blinks into a different arrangement.
 //
-// Not at boot -- a deep link into the Segments tab would animate from a layout
-// that was never on screen -- and not when the reader has asked for less motion.
+// Not at boot, because a deep link into the Segments tab would animate from a
+// layout that was never on screen. And not when the reader has asked for less
+// motion.
 function show(next, opts = {}) {
   const moving = next !== view;
   if (!booted || !document.startViewTransition ||
@@ -174,7 +176,7 @@ function show(next, opts = {}) {
   } else {
     document.startViewTransition(() => apply(next, opts));
   }
-  // The conversion is started after the switch and never awaited, so the tab
+  // The conversion starts after the switch and is never awaited, so the tab
   // opens at once and fills in a beat later. A tab that waited on the worker
   // before showing anything would make the cheapest thing on the page feel like
   // the most expensive one.
@@ -192,17 +194,17 @@ function apply(next, { focus = false } = {}) {
     if (on && focus) tab.focus();
   }
   // The Routing tab is one text field and belongs in a sidebar. The Segments tab
-  // is a thirteen-column table that does not fit one -- it wants 1,262px with
-  // dates and times shown -- so it takes the page and the answer goes under it.
-  // Toggling a class rather than restyling in place keeps both arrangements in
+  // is a thirteen-column table that will not fit one -- it wants 1,262px with
+  // dates and times shown -- so it takes the page and the answer moves under it.
+  // Toggling a class, rather than restyling in place, keeps both arrangements in
   // the stylesheet where the rest of the layout lives.
   $('layout').classList.toggle('wide-form', next === 'segments');
-  // The way back names what it goes back to, which is whichever of the two ways
+  // The way back names where it goes back to, which is whichever of the two ways
   // in is open.
   $('totop-label').textContent = next === 'segments' ? 'Back to the segments' : 'Back to the routing';
-  // The table can still be wider than its container on a narrow screen, and the
-  // browser keeps a scroll offset from while the panel was hidden, which lands
-  // the reader mid-table with the segment numbers off to the left.
+  // On a narrow screen the table can still be wider than its container, and the
+  // browser keeps the scroll offset from while the panel was hidden. That lands
+  // the reader mid-table, with the segment numbers off to the left.
   if (next === 'segments') {
     const box = document.querySelector('#panel-segments .scroll-x');
     if (box) box.scrollLeft = 0;
@@ -215,7 +217,7 @@ for (const [name, id] of Object.entries(TABS)) {
 }
 
 // Arrow keys move between tabs, which is what a tablist is expected to do. With
-// exactly two of them every arrow is the same toggle.
+// exactly two tabs, every arrow is the same toggle.
 $('tab-routing').parentElement.addEventListener('keydown', e => {
   const other = view === 'routing' ? 'segments' : 'routing';
   if (['ArrowRight', 'ArrowDown', 'ArrowLeft', 'ArrowUp'].includes(e.key)) show(other, { focus: true });
@@ -232,35 +234,36 @@ document.querySelectorAll('.jump-routing').forEach(b =>
 
 // --- keeping the two tabs saying the same thing ----------------------------
 //
-// They are two ways of writing one journey, so opening one converts what is in
-// the other: the routing is composed from the table, and the table is the
+// The two tabs are two ways of writing one journey, so opening one converts what
+// is in the other. The routing is written from the table, and the table is the
 // validator's own reading of the routing. This used to be a button, which asked
-// the reader to know that the tabs were not already showing the same itinerary
-// and to remember to say so.
+// the reader to notice that the tabs were not already showing the same itinerary
+// and then to remember to say so.
 //
-// Neither direction is implemented here. Composing calls the `routing`
-// operation, and reading is the annotation pass of a `validate` call whose
-// verdict is thrown away -- pressing a tab is not asking for a verdict. A copy
-// of the grammar in the browser would be the copy nothing tests.
+// Neither direction is implemented here. Writing a routing calls the `routing`
+// operation. Reading one is the annotation pass of a `validate` call whose
+// verdict is thrown away, because pressing a tab is not asking for a verdict. A
+// copy of the grammar in the browser would be the copy nothing tests.
 
-// What a routing can say about the table. The two sides are in agreement when
-// both the routing text and this signature are the ones recorded at the last
-// conversion, and a conversion only runs when they are not.
+// What a routing can say about the table. The two sides agree when both the
+// routing text and this signature match the ones recorded at the last
+// conversion, and a conversion only runs when they do not.
 //
-// It deliberately covers only the columns a routing has notation for. A date or
-// a flight number typed into a table the routing still describes exactly is not
-// a disagreement, and treating it as one would send the table back through the
-// parser -- which would hand back the same journey with the date deleted, on the
-// way to a tab the reader only wanted to look at.
+// It covers only the columns a routing has notation for, on purpose. A date or a
+// flight number typed into a table the routing still describes exactly is not a
+// disagreement. Treating it as one would send the table back through the parser,
+// which would hand back the same journey with the date deleted, on the way to a
+// tab the reader only wanted to look at.
 const SPOKEN = ['type', 'from', 'to', 'marketing', 'stop'];
 
-// The clock is part of it: a routing composed with times on can say things one
-// composed with them off cannot, because the validator reads a transfer off the
-// ground time. Switching the clock off is a change to what the routing would
-// say even though no cell moved.
+// The clock is part of the signature. A routing written with times on can say
+// things one written with them off cannot, because the validator reads a
+// transfer off the ground time. Switching the clock off changes what the routing
+// would say, even though no cell moved.
 //
 // The separators are characters no cell can hold -- every value here is a code,
-// a place or one of two words -- so two different tables cannot sign the same.
+// a place, or one of two words -- so two different tables cannot produce the
+// same signature.
 const tableSignature = () =>
   [$('times').value, $('origin').value.trim(),
    ...rows.map(r => SPOKEN.map(f => (r[f] || '').trim()).join('|'))]
@@ -270,30 +273,31 @@ let agreement = { route: null, sig: null };
 const agree = () => { agreement = { route: $('route').value.trim(), sig: tableSignature() }; };
 const agreed = () => agreement.route === $('route').value.trim() && agreement.sig === tableSignature();
 
-// One conversion at a time, and only the newest one gets to write anything: two
-// quick presses of the tabs would otherwise have the first reply land on top of
-// the second.
+// One conversion at a time, and only the newest one may write anything.
+// Otherwise two quick presses of the tabs would let the first reply land on top
+// of the second.
 let conversion = 0;
 
 function carryOver(next) {
   const token = ++conversion;
   const route = $('route').value.trim();
   // Both messages are about a conversion, so both go stale the moment another
-  // one is attempted -- or the moment the two tabs turn out to agree, which is
-  // the state a message saying they cannot be reconciled contradicts.
+  // conversion is attempted. They also go stale the moment the two tabs turn out
+  // to agree, which is exactly what a message saying they cannot be reconciled
+  // denies.
   $('routingerr').classList.add('hidden');
   $('segerr').classList.add('hidden');
   if (next === 'routing' && rows.length && !agreed()) compose(token);
   else if (next === 'segments' && route && !agreed()) readIntoTable(route, token);
-  // Nothing to convert -- but this token has still superseded whatever was in
-  // flight, and that call's own release is now a no-op, so the release has to
-  // happen here or the buttons stay disabled behind a reply nobody wants.
+  // There is nothing to convert. This token has still superseded whatever was in
+  // flight, though, and that call's own release is now a no-op. So the release
+  // has to happen here, or the buttons stay disabled behind a reply nobody wants.
   else converting(token, false);
 }
 
-// Held while a conversion is in flight so that neither Validate can run against
-// half-converted state, and released only by the conversion that is still the
-// current one.
+// Held while a conversion is in flight, so neither Validate can run against
+// half-converted state. Only the conversion that is still the current one may
+// release it.
 function converting(token, on) {
   if (token !== conversion) return;
   buttons().forEach(b => { b.disabled = on; });
@@ -312,10 +316,11 @@ async function compose(token) {
       agree();
       announce(`Routing: ${res.data.route}`);
     } else {
-      // The field holds the previous composition, which describes a journey the
-      // table no longer contains -- so it goes, rather than sitting under a
-      // message saying this itinerary has no routing. Anything the reader typed
-      // themselves stays: that is theirs, and the message explains the rest.
+      // The field holds the routing written last time, which describes a journey
+      // the table no longer contains. So it is cleared, rather than left sitting
+      // under a message saying this itinerary has no routing. Anything the reader
+      // typed themselves stays, because that is theirs, and the message explains
+      // the rest.
       if ($('route').value.trim() === agreement.route) {
         $('route').value = '';
         $('composed').classList.add('hidden');
@@ -336,11 +341,11 @@ async function readIntoTable(route, token) {
     if (token !== conversion) return;
     if (res.ok && res.data.annotations && res.data.annotations.segments) {
       adoptSegments(res.data.annotations);
-      // A link may have carried classes for a routing whose rows only exist now.
+      // A link may have carried classes for a routing whose rows exist only now.
       if (pendingClasses || pendingFamilies) { applyPositional(); render(); }
       agree();
-      // The rows are the validator's reading of the routing and not what any
-      // report on screen was about.
+      // The rows are the validator's reading of the routing, not what any report
+      // on screen was about.
       markStale();
       announce(`${rows.length} segment${rows.length === 1 ? '' : 's'} from the routing.`);
     } else {
@@ -360,14 +365,14 @@ function fail(el, text) {
 }
 
 // Everything the page knows about earning programmes comes from the validator's
-// own programme list -- the names, the currencies, the fare families and the
-// provenance. The page names none of them, for the same reason it hardcodes no
-// rule: a second copy is the one that goes out of date.
+// own programme list: the names, the currencies, the fare families and the
+// provenance. The page names none of them itself, for the same reason it
+// hardcodes no rule. A second copy is the copy that goes out of date.
 let PROGRAMS = [];
 let FAMILIES = [];
-// Which programme sections are expanded. Every programme is priced and every
-// total is shown whatever this holds -- it decides how much of the detail behind
-// a total is on screen, and nothing about what was asked. It used to be a set of
+// Which programme sections are open. Every programme is priced and every total
+// is shown whatever this holds. It decides how much of the detail behind a total
+// is on screen, and nothing about what was asked. It used to be a set of
 // tickboxes deciding which programmes to price at all, which made the reader
 // choose before they had seen anything to choose between.
 let opened = null;   // null until the list arrives; then a Set of programme ids
@@ -472,27 +477,28 @@ function render() {
 // --- filling a column ------------------------------------------------------
 //
 // A ticket is mostly one carrier, one booking class and one kind of connection
-// repeated down a column, and typing that seven times is seven chances to make
-// a typo the validator will then faithfully report. So the focused cell carries
-// the spreadsheet gesture for it: a small square at its corner that fills the
-// value into every row you drag it across. Ctrl+D does the same to the bottom of
+// repeated down a column. Typing that seven times is seven chances to make a typo
+// the validator will then faithfully report. So the focused cell carries the
+// spreadsheet gesture for it: a small square at its corner that fills the value
+// into every row you drag it across. Ctrl+D does the same down to the bottom of
 // the table, because a mouse-only gesture is no gesture at all for some readers.
 //
-// Only on columns that describe the ticket rather than the sector. A carrier, a
-// class, a fare family and a kind of connection are things a whole journey tends
-// to share; an airport, a flight number and a departure time identify one
-// sector, and filling those down a column can only produce a journey nobody
-// could fly. The handle is not offered where the only outcome is wrong data.
+// The handle appears only on columns that describe the ticket rather than the
+// sector. A carrier, a class, a fare family and a kind of connection are things a
+// whole journey tends to share. An airport, a flight number and a departure time
+// identify one sector, and filling those down a column can only produce a journey
+// nobody could fly. The handle is not offered where the only outcome is wrong
+// data.
 const FILLABLE = new Set(['type', 'stop', 'marketing', 'operating', 'class', 'family']);
 
 // Which columns may also be filled sideways. Only the two carrier codes, and
 // only because of what they mean: on a sector nobody codeshared they hold the
 // same code, so the value in one is already the answer for the other, and
 // dragging across says so in one gesture instead of two typings. Nothing else on
-// a row is like its neighbour -- a booking class beside a flight number beside
-// an airport are three different kinds of thing, and a value dragged between
-// them could only be wrong. Each group is listed in the order the columns are
-// laid out, because a drag across fills everything between the two ends.
+// a row resembles its neighbour. A booking class beside a flight number beside an
+// airport are three different kinds of thing, and a value dragged between them
+// could only be wrong. Each group is listed in the order the columns are laid
+// out, because a drag across fills everything between the two ends.
 const LATERAL = [['marketing', 'operating']];
 const lateralGroup = f => LATERAL.find(g => g.includes(f));
 
@@ -512,18 +518,19 @@ $('segments').addEventListener('focusin', e => {
   const el = e.target.closest('[data-f]');
   if (!el || !FILLABLE.has(el.dataset.f) || el.disabled) { fillHandle.remove(); activeCell = null; return; }
   activeCell = { i: segRows().indexOf(el.closest('tr')), f: el.dataset.f };
-  // The tooltip names both directions only where both exist, so it never offers
-  // a gesture the cell under it does not have.
+  // The tooltip names both directions only where both exist, so it never offers a
+  // gesture the cell under it does not have.
   fillHandle.title = lateralGroup(activeCell.f)
     ? 'Drag down to fill the column, or across to the other carrier. Ctrl+D fills to the last segment.'
     : 'Drag to fill the column. Ctrl+D fills to the last segment.';
   el.closest('.fillable').appendChild(fillHandle);
 });
 
-// The handle marks the current cell, so it stays while focus moves within the
-// table and goes when focus leaves it altogether -- otherwise it is an accent
-// dot sitting on a table nobody is editing. Never mid-drag: pressing the handle
-// deliberately keeps focus where it is, and the pointer is still down.
+// The handle marks the current cell, so it stays while focus moves inside the
+// table and goes when focus leaves the table altogether. Otherwise it is an
+// accent dot sitting on a table nobody is editing. It never goes mid-drag:
+// pressing the handle keeps focus where it is on purpose, and the pointer is
+// still down.
 $('segments').addEventListener('focusout', e => {
   if (drag) return;
   const to = e.relatedTarget;
@@ -532,9 +539,9 @@ $('segments').addEventListener('focusout', e => {
   activeCell = null;
 });
 
-// Which row a pointer is over, by geometry rather than by hit testing: dragging
-// past the last row is the ordinary way to fill the whole column, and there is
-// nothing under the pointer there to ask.
+// Which row a pointer is over, worked out from geometry rather than by hit
+// testing. Dragging past the last row is the ordinary way to fill a whole
+// column, and out there is nothing under the pointer to ask.
 function rowAt(clientY) {
   const trs = segRows();
   for (let k = 0; k < trs.length; k++) {
@@ -543,11 +550,11 @@ function rowAt(clientY) {
   return trs.length - 1;
 }
 
-// Which column of the group the pointer is over, by distance rather than by
-// containment: there are eight pixels of cell padding between two fields, and a
-// pointer resting in the gap has to mean one of them. Measured on the row the
-// drag started from, whose cells are known to exist and whose columns sit at the
-// same x as every other row's.
+// Which column of the group the pointer is over, worked out from distance rather
+// than containment. There are eight pixels of cell padding between two fields,
+// and a pointer resting in that gap has to mean one of them. It is measured on
+// the row the drag started from, whose cells are known to exist and whose columns
+// sit at the same x as every other row's.
 function fieldAt(from, clientX) {
   const group = lateralGroup(from);
   if (!group) return from;
@@ -571,11 +578,11 @@ function paint() {
   }
 }
 
-// Every cell the fill covers except the one it started from -- the rectangle
-// between the two corners, which for a drag straight down is the column the
-// gesture began as. In either direction on both axes: dragging up a column is
-// as reasonable as dragging down it, and back across to the marketing carrier
-// as reasonable as out to the operating one.
+// Every cell the fill covers except the one it started from. That is the
+// rectangle between the two corners, which for a drag straight down is just the
+// column the gesture began in. It works in either direction on both axes:
+// dragging up a column is as reasonable as dragging down it, and back across to
+// the marketing carrier as reasonable as out to the operating one.
 function covered(from, to) {
   const [lo, hi] = to.i < from.i ? [to.i, from.i] : [from.i, to.i];
   const out = [];
@@ -595,9 +602,10 @@ function fieldSpan(from, to) {
 fillHandle.addEventListener('pointerdown', e => {
   if (!activeCell) return;
   e.preventDefault();   // keep focus on the cell being filled from
-  // Capture so the drag survives leaving the square, which it does immediately.
-  // It can refuse -- a pointer that is already gone -- and the drag is still
-  // well defined without it, because every listener below is on the handle.
+  // Capture the pointer so the drag survives leaving the square, which it does
+  // immediately. Capture can refuse -- for a pointer that is already gone -- and
+  // the drag still works without it, because every listener below is on the
+  // handle.
   try { fillHandle.setPointerCapture(e.pointerId); } catch { /* not captured */ }
   drag = { ...activeCell, to: activeCell.i, toF: activeCell.f };
   paint();
@@ -624,15 +632,15 @@ const cancelDrag = () => { if (drag) { drag = null; paint(); } };
 fillHandle.addEventListener('pointercancel', cancelDrag);
 document.addEventListener('keydown', e => { if (e.key === 'Escape') cancelDrag(); });
 
-// The keyboard path, and the reason the gesture is not mouse-only. Ctrl+D is
-// what a spreadsheet binds fill-down to; the browser binds it to bookmarking,
+// The keyboard path, and the reason this gesture is not mouse-only. Ctrl+D is
+// what a spreadsheet binds fill-down to. The browser binds it to bookmarking,
 // which is why this takes the key rather than letting it through.
 //
-// There is no keyboard twin for the sideways fill, and it is not an oversight:
-// filling down replaces up to fifteen typings with one key, which is worth a
-// binding, while filling across replaces exactly one. Ctrl+R is what a
-// spreadsheet would use and it is the browser's reload -- a key worth taking
-// for fifteen keystrokes is not worth taking for one.
+// There is no keyboard twin for the sideways fill, and that is not an oversight.
+// Filling down replaces up to fifteen typings with one key, which is worth a
+// binding. Filling across replaces exactly one. Ctrl+R is what a spreadsheet
+// would use, and it is the browser's reload: a key worth taking for fifteen
+// keystrokes is not worth taking for one.
 $('segments').addEventListener('keydown', e => {
   if ((e.key !== 'd' && e.key !== 'D') || !(e.ctrlKey || e.metaKey) || e.altKey || e.shiftKey) return;
   const el = e.target.closest('[data-f]');
@@ -643,9 +651,9 @@ $('segments').addEventListener('keydown', e => {
 });
 
 // The fill writes only where typing would be allowed. A surface sector has no
-// carrier and the last segment has no arrival to describe, and both are already
-// disabled in the markup -- so this reads that rather than keeping a second copy
-// of the rule, which is the copy that would go out of date.
+// carrier, and the last segment has no arrival to describe. Both are already
+// disabled in the markup, so this reads that instead of keeping a second copy of
+// the rule, which is the copy that would go out of date.
 function fill(from, to) {
   const value = rows[from.i][from.f];
   const cells = covered(from, to);
@@ -665,10 +673,10 @@ function fill(from, to) {
   announce(`Filled ${n} cell${n === 1 ? '' : 's'}.`);
 }
 
-// Debounced per input, not globally: every from/to field on the page shares this
-// function, and one timer between them means tabbing to the next airport cancels
-// the lookup for the one just typed. The sequence number drops a slow reply that
-// lands after a newer one for the same field.
+// Debounced per input, not globally. Every from/to field on the page shares this
+// function, and one timer between them would mean tabbing to the next airport
+// cancels the lookup for the one just typed. The sequence number drops a slow
+// reply that lands after a newer one for the same field.
 const typeahead = new WeakMap();
 function suggest(input, listId) {
   const state = typeahead.get(input) || { timer: null, seq: 0 };
@@ -703,16 +711,16 @@ function buildRequest(routeString) {
     const s = { type: r.type, from: r.from.trim().toUpperCase(), to: r.to.trim().toUpperCase() };
     if (r.type === 'flight') {
       const mkt = r.marketing.trim(), op = r.operating.trim();
-      // `carrier` is the server's shorthand for both fields; sending it only when
-      // they genuinely match keeps the 4(j) "operator unknown" warning reachable
-      // from the form.
+      // `carrier` is the server's shorthand for both fields. Sending it only
+      // when the two really do match keeps the 4(j) "operator unknown" warning
+      // reachable from the form.
       if (mkt && op && mkt.toUpperCase() === op.toUpperCase()) s.carrier = mkt;
       else { if (mkt) s.marketingCarrier = mkt; if (op) s.operatingCarrier = op; }
       if (r.flight.trim()) s.flight = r.flight.trim();
       if (r.class.trim()) s.bookingClass = r.class.trim().toUpperCase();
       if (r.family) s.fareFamily = r.family;
-      // The server refuses times sent in routing mode rather than discarding them
-      // behind the user's back, so they are withheld here.
+      // The server refuses times sent in routing mode rather than throwing them
+      // away behind the user's back, so they are held back here.
       if (!routing) { if (r.dep) s.dep = r.dep; if (r.arr) s.arr = r.arr; }
     }
     if (r.stop && i < rows.length - 1) s.stop = r.stop;
@@ -726,16 +734,16 @@ function buildRequest(routeString) {
 
 const buttons = () => [$('validate'), $('parse')];
 
-// Cleared first so that re-validating an unchanged itinerary is still a change to
-// the live region, and therefore still announced.
+// Cleared first, so that re-validating an unchanged itinerary still counts as a
+// change to the live region and so is still announced.
 function announce(text) {
   $('announce').textContent = '';
   setTimeout(() => { $('announce').textContent = text; }, 60);
 }
 
 // A report describes the itinerary that was posted, not the one in the form. Once
-// they diverge the report is marked rather than cleared: the previous verdict is
-// still worth reading, it just is not an answer about what is on screen now.
+// the two differ, the report is marked rather than cleared. The previous verdict
+// is still worth reading; it just is not an answer about what is on screen now.
 let reported = false;
 
 function markStale() {
@@ -747,11 +755,11 @@ function markFresh() {
   $('stale').classList.add('hidden');
 }
 
-// A class or a fare family is authored data on a row that may still be derived:
-// the routing regenerates every other cell exactly, and it has no notation for
-// either of these. So editing one leaves the rows derived and the link readable,
-// and the two values ride along in `b` and `f` instead of dragging the whole
-// table into `s` as two kilobytes of base64.
+// A class or a fare family is typed by hand onto a row that may still be
+// derived. The routing regenerates every other cell exactly, and it has no
+// notation for either of these. So editing one leaves the rows derived and the
+// link readable, and the two values ride along in `b` and `f` instead of
+// dragging the whole table into `s` as two kilobytes of base64.
 const AUTHORED_ELSEWHERE = new Set(['class', 'family']);
 
 for (const ev of ['input', 'change']) {
@@ -765,16 +773,16 @@ for (const ev of ['input', 'change']) {
 }
 
 // A verdict the reader cannot see is not an answer. In the Segments tab the
-// answer is under a form that is taller than most viewports, and on any screen
-// too narrow for two columns it is under the form in either tab -- so pressing
-// Validate rendered a report off the bottom of the window and the page looked
-// like it had done nothing.
+// answer sits under a form taller than most viewports, and on any screen too
+// narrow for two columns it sits under the form in either tab. So pressing
+// Validate used to render a report off the bottom of the window, and the page
+// looked as though it had done nothing.
 //
-// Only when it is actually out of the way. On a wide screen in the Routing tab
-// the report is already beside the form, and scrolling a page whose answer is
-// on screen moves the reader for nothing. The test is the panel's top: above
-// the fold, or far enough down that the verdict band is the only thing that
-// would fit, and it gets scrolled.
+// This only scrolls when the report really is out of the way. On a wide screen
+// in the Routing tab the report is already beside the form, and scrolling a page
+// whose answer is on screen moves the reader for nothing. The test is the panel's
+// top: it gets scrolled if that is above the fold, or far enough down that the
+// verdict band is the only part that would fit.
 const glide = () => (matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth');
 
 function revealReport() {
@@ -788,22 +796,23 @@ function revealReport() {
 // the form it scrolled away from is now somewhere above the top of the window
 // with nothing on screen to say so.
 //
-// It appears while the form has effectively left the window, and not before:
-// with any usable amount of it still showing the reader can see where to go, and
-// on a wide screen, where the form is a sidebar beside the answer rather than
-// above it, that is always -- so the button never appears there at all.
+// The button appears once the form has effectively left the window, and not
+// before. While any usable amount of it is still showing, the reader can see
+// where to go. On a wide screen the form is a sidebar beside the answer rather
+// than above it, so that is always true and the button never appears there at
+// all.
 //
-// "Effectively" is the negative rootMargin, and it is not a fudge. Exactly is
-// what it was, and exactly is where revealReport() lands: the report's top is
-// the form's bottom, so scrolling one to the top of the window puts the other's
-// last pixel on the line, where a browser is within its rights to call it
-// visible and the button never came. Shrinking the root by six rems asks a
-// better question anyway -- a strip of form thinner than one row of fields is
-// not something anyone can work in.
+// "Effectively" is the negative rootMargin, and it is not a fudge. It used to be
+// exact, and exact is also where revealReport() lands: the report's top is the
+// form's bottom, so scrolling one to the top of the window puts the other's last
+// pixel on the line. A browser is within its rights to call that visible, and
+// the button never came. Shrinking the root by six rems asks a better question
+// anyway, because a strip of form thinner than one row of fields is not
+// something anyone can work in.
 //
-// An observer rather than a scroll handler because the question is about where
-// the form is, not about scrolling: switching tabs changes the answer without
-// anyone scrolling anything.
+// This is an observer rather than a scroll handler, because the question is
+// about where the form is, not about scrolling. Switching tabs changes the
+// answer without anyone scrolling anything.
 const toTop = $('totop');
 new IntersectionObserver(([e]) => { toTop.hidden = e.isIntersecting; },
                          { threshold: 0, rootMargin: '-96px 0px 0px 0px' })
@@ -811,16 +820,17 @@ new IntersectionObserver(([e]) => { toTop.hidden = e.isIntersecting; },
 
 toTop.addEventListener('click', () => {
   $('entry').scrollIntoView({ block: 'start', behavior: glide() });
-  // Focus follows the scroll, or this is a control that moves the page and
-  // leaves the keyboard behind it. Onto the open tab rather than onto the
-  // section: a section is focusable only with a tabindex, and focusing one draws
-  // the focus ring around the whole panel, which is a great deal of accent for
-  // "you are here". The tab is the top of the form, it is where switching tabs
-  // already puts focus, and it is one Tab key from the first field.
+  // Focus follows the scroll. Otherwise this is a control that moves the page
+  // and leaves the keyboard behind. Focus goes to the open tab rather than to
+  // the section, because a section is focusable only with a tabindex, and
+  // focusing one draws the focus ring around the whole panel, which is a great
+  // deal of accent for "you are here". The tab is the top of the form, it is
+  // where switching tabs already puts focus, and it is one Tab key from the
+  // first field.
   $(TABS[view]).focus({ preventScroll: true });
 });
 
-// `reveal` is off for the one validation nobody asked for: a linked itinerary
+// `reveal` is off for the one validation nobody asked for. A linked itinerary
 // validates itself at boot, and a page that scrolls away from its own form
 // before the reader has touched anything is a page that moved on its own.
 async function validate(routeString, { reveal = true } = {}) {
@@ -842,23 +852,22 @@ async function validate(routeString, { reveal = true } = {}) {
         // A link may have carried classes for a routing whose rows only exist
         // now that it has been parsed.
         if (pendingClasses || pendingFamilies) { applyPositional(); render(); }
-        // Validating a routing is also a conversion, and the tabs now agree
-        // about this journey -- so opening Segments after it converts nothing
-        // and cannot discard anything.
+        // Validating a routing counts as a conversion too, and the tabs now
+        // agree about this journey. So opening Segments afterwards converts
+        // nothing and cannot discard anything.
         agree();
       }
       renderReport(res.data, body);
-      // Before earning rather than after it. The verdict is on screen now and
-      // the earn panel is below the report either way, so waiting for the second
-      // answer would only delay the scroll behind a round trip the reader is not
-      // waiting for.
+      // This happens before earning rather than after. The verdict is on screen
+      // now, and the earn panel sits below the report either way, so waiting for
+      // the second answer would only delay the scroll behind a round trip the
+      // reader is not waiting for.
       if (reveal) revealReport();
       // Earning is asked separately. It runs no fare rules, so it is answered
-      // even when the verdict is invalid -- being unable to sell a ticket does
-      // not stop it earning.
+      // even when the verdict is invalid: a ticket nobody can sell still earns.
       //
       // Always from the rows, never from the routing string, even when the
-      // routing is what was validated: a routing has no notation for a booking
+      // routing is what was validated. A routing has no notation for a booking
       // class, and the rows adopted from it are the validator's own reading of
       // the same journey with the classes attached.
       await earn(rows.length ? buildRequest() : body);
@@ -903,9 +912,9 @@ function renderReport(data, body) {
   const nc = data.notChecked || [];
   const checks = data.checks || [];
   const look = VERDICT[data.verdict] || VERDICT.indeterminate;
-  // The one place the clean outcome is written, now that it is not also said
-  // below the verdict. A live region should read out what the page shows, so
-  // both take the same string.
+  // The one place the clean outcome is written, now that it is no longer also
+  // said below the verdict. A live region should read out what the page shows,
+  // so both take the same string.
   const counts = tally(v) || 'Every rule this input can answer is satisfied.';
 
   markFresh();
@@ -935,10 +944,10 @@ function renderReport(data, body) {
   drawMap(ann);
 }
 
-// Every registered programme, every time. Asking is cheap -- the validator is in
-// this tab -- and a total the reader did not ask for is the only way they find
-// out the ticket was worth crediting somewhere they had not thought of, which is
-// the question having more than one programme is for.
+// Every registered programme, every time. Asking is cheap, because the validator
+// is in this tab. And a total the reader did not ask for is the only way they
+// discover the ticket was worth crediting somewhere they had not thought of,
+// which is the whole reason for having more than one programme.
 async function earn(body) {
   const asked = { ...body };
   if (tiers.size) {
@@ -955,19 +964,20 @@ async function earn(body) {
 
 // --- earning ---------------------------------------------------------------
 
-// A number the reader is meant to be able to check, so every one of them says
-// which row it came from. Four shapes, and none of the three that is not a
-// number may be shown as one: a range is two rates the input could not choose
-// between, `no` is a rate the table publishes as nothing, and an unknown is a
-// rate nobody stated. A 0 would misreport all three, and differently.
+// Every number here is one the reader is meant to be able to check, so each says
+// which row it came from. There are four shapes, and none of the three that are
+// not numbers may be shown as one. A range is two rates the input could not
+// choose between. `no` is a rate the table publishes as nothing. An unknown is a
+// rate nobody stated. A 0 would misreport all three, and misreport each of them
+// differently.
 function amount(a, currencies, program) {
   const name = (currencies.find(c => c.key === a.currency) || {}).name || a.currency;
   if (a.known === 'range') return `${num(a.low)}–${num(a.high)} ${esc(name)}`;
   if (a.known === 'published_as_none') return `no ${esc(name)}`;
   if (a.known !== 'known') return `? ${esc(name)}`;
-  // A figure with a status bonus in it shows the bonus. The base rate is what
-  // the published table says and the bonus is what the member's card adds --
-  // two facts from two sources, and a reader checking either needs both.
+  // A figure with a status bonus in it shows the bonus separately. The base rate
+  // is what the published table says, and the bonus is what the member's card
+  // adds: two facts from two sources, and a reader checking either needs both.
   if (a.bonus > 0) {
     return `${num(a.value)} ${esc(name)} <span class="text-muted">(${num(a.base)} + ${num(a.bonus)} ${esc(tierName(program, a.tier))})</span>`;
   }
@@ -985,15 +995,16 @@ const num = (n) => Number(n).toLocaleString('en-US');
 function total(t, currencies) {
   const name = (currencies.find(c => c.key === t.currency) || {}).name || t.currency;
   // Nothing resolved at all. "0+" is arithmetically true and reads as a figure,
-  // which is the one thing this total must not do when no sector was priced.
+  // and looking like a figure is the one thing this total must not do when no
+  // sector was priced.
   if (t.lowerBound && t.high === 0) {
     return `<span class="text-muted">no ${esc(name)} priced</span>
             <span class="text-muted">(${t.unpricedSegments} ${t.unpricedSegments === 1 ? 'sector' : 'sectors'})</span>`;
   }
   const figure = t.amount === null ? `${num(t.low)}–${num(t.high)}` : num(t.amount);
   // The lower bound is said in the same breath as the number. A footnote would
-  // let the total be read off the line above it, which is the whole failure this
-  // is here to prevent.
+  // let the total be read off the line above it, and that is exactly the failure
+  // this is here to prevent.
   return t.lowerBound
     ? `<span class="mono font-semibold">${figure}+</span> ${esc(name)}
        <span class="text-muted">(${t.unpricedSegments} unpriced)</span>`
@@ -1008,10 +1019,10 @@ const EARN_OUTCOME = {
 
 // A reason that applies to six sectors is one fact, not six. Repeating it once
 // per row pushed the priced sectors -- the ones a reader came for -- off the
-// bottom of a panel filled with the same sentence, and made a journey where
-// nothing could be priced look like six different problems. Sectors that could
-// not be priced are grouped by the reason they could not, in the order the
-// reason first appears, and the priced ones keep their own rows.
+// bottom of a panel full of the same sentence, and made a journey where nothing
+// could be priced look like six separate problems. So sectors that could not be
+// priced are grouped by the reason why, in the order each reason first appears.
+// The priced ones keep their own rows.
 function earnGroups(segments) {
   const byReason = new Map();
   const out = [];
@@ -1027,18 +1038,18 @@ function earnGroups(segments) {
   return out;
 }
 
-// Which sentences in this register would be printed more than once. Both of the
-// prose fields are card-level facts wearing sector-level clothes: the bucket
-// basis is read off the fare, which is one fare for the whole ticket, so it says
-// the same thing on every priced row, and an assumption drawn from it repeats
-// with it. Six copies of one sentence is not six facts, and it crowds out the
-// figures a reader came for. Anything printed twice is printed once under the
-// table instead, numbered in the order it first appears.
+// Which sentences in this register would be printed more than once. Both prose
+// fields are really card-level facts dressed as sector-level ones. The bucket
+// basis is read off the fare, and there is one fare for the whole ticket, so it
+// says the same thing on every priced row. An assumption drawn from it repeats
+// along with it. Six copies of one sentence is not six facts, and it crowds out
+// the figures a reader came for. So anything that would print twice is printed
+// once under the table instead, numbered in the order it first appears.
 //
-// Only what is actually rendered is counted. Sectors that could not be priced
+// Only what actually gets rendered is counted. Sectors that could not be priced
 // are already grouped by their reason, and a group prints its leader's prose
-// once however many rows it holds; counting the segments behind it would number
-// a sentence that appears on screen exactly once.
+// once however many rows it holds. Counting the segments behind it would put a
+// number on a sentence that appears on screen exactly once.
 function earnFootnotes(groups) {
   const order = [], seen = new Map();
   for (const g of groups) {
@@ -1053,10 +1064,11 @@ function earnFootnotes(groups) {
   return notes;
 }
 
-// The marker is what keeps a hoisted sentence traceable: it sits where the words
+// The marker is what keeps a moved sentence traceable. It sits where the words
 // were, against the thing they qualify, so the figure is still one step from its
-// reason rather than none. An assumption keeps its warn colour even reduced to a
-// digit, because the row still has a caveat on it and must still look like it.
+// reason rather than none at all. An assumption keeps its warn colour even when
+// reduced to a digit, because the row still carries a caveat and must still look
+// like it does.
 const footMark = (n, cls) => `<sup class="ml-px text-[9px] ${cls}">${n}</sup>`;
 
 function earnRows(p, groups, notes) {
@@ -1070,7 +1082,7 @@ function earnRows(p, groups, notes) {
         : `<span class="${look.cls}">${esc(r.reason || look.word)}</span>`;
       // The row it was read off, under the figure it produced. This is the earn
       // register, and it is on by default for the same reason the check register
-      // exists: a number nobody can trace is worse than no number.
+      // exists: a number nobody can trace is worse than no number at all.
       const why = r.bucketBasis ? notes.get(r.bucketBasis) : undefined;
       const bucket = `${esc(r.bucket)}${
         !r.bucketBasis ? ''
@@ -1082,8 +1094,8 @@ function earnRows(p, groups, notes) {
              r.nearBoundaryMiles ? ` <span class="text-warn">· within 1.5% of the ${num(r.nearBoundaryMiles)}-mile edge</span>` : ''}`
         : '';
       // No rule above the first sector. The table sits directly under the
-      // programme's own summary, which is already ruled off from it, and a second
-      // line a few pixels below the first reads as a box drawn around nothing.
+      // programme's own summary, which already has a rule below it, and a second
+      // line a few pixels under the first reads as a box drawn around nothing.
       return `<tr class="border-t border-rule align-baseline first:border-t-0">
         <td class="mono w-6 py-1 pr-1 text-[11px] text-muted">${g.rows.map(x => x.segment).join('<br>')}</td>
         <td class="mono w-[5.5rem] py-1 pr-2 text-[12px]">${g.rows.map(x => `${esc(x.from)}–${esc(x.to)}`).join('<br>')}</td>
@@ -1096,20 +1108,20 @@ function earnRows(p, groups, notes) {
     }).join('')}</tbody></table>`;
 }
 
-// One programme, as a section that opens. The name and the totals are the
-// summary and are therefore always on screen, whether or not it is open; a
-// reader comparing two programmes is comparing exactly those two lines. What
-// opening adds is everything that makes a total checkable — the per-segment
-// register, the estimate caveat, the tables and their fetch dates — plus the
-// one control that changes the figures, which belongs to the programme that
-// publishes the tiers and not to a row of settings above the panel.
+// One programme, as a section that opens. The name and the totals make up the
+// summary, so they are always on screen whether the section is open or not. A
+// reader comparing two programmes is comparing exactly those two lines. Opening
+// the section adds everything that makes a total checkable — the per-segment
+// register, the estimate caveat, and the tables with their fetch dates — plus
+// the one control that changes the figures. That control belongs to the
+// programme that publishes the tiers, not to a row of settings above the panel.
 function earnProgram(p) {
   const detail = p.segments.length;
   const groups = earnGroups(p.segments);
   const notes = earnFootnotes(groups);
-  // The tiers come from /api/programs and not from the reply being rendered: an
-  // earn report says what a journey earned, and the list of tiers a programme
-  // publishes is a fact about the programme.
+  // The tiers come from /api/programs rather than from the reply being rendered.
+  // An earn report says what a journey earned, whereas the list of tiers a
+  // programme publishes is a fact about the programme.
   const published = (PROGRAMS.find(x => x.id === p.id) || {}).tiers || [];
   const tierPicker = published.length ? `
     <label class="mt-1 flex flex-wrap items-center gap-2 text-[12px] text-muted">
@@ -1170,10 +1182,10 @@ function earnProgram(p) {
   </details>`;
 }
 
-// Set when a tier was just changed, so the control the reader is holding keeps
-// focus across the re-render its own change caused. The picker used to sit
-// outside this region and never lose it; moving it into the programme is worth
-// one line here.
+// Set when a tier has just changed, so the control the reader is holding keeps
+// focus through the re-render its own change caused. The picker used to sit
+// outside this region and never lost focus. Moving it into the programme is
+// worth one line here.
 let refocusTier = null;
 
 function renderEarn(data) {
@@ -1182,18 +1194,18 @@ function renderEarn(data) {
   if (!programs.length) { panel.classList.add('hidden'); return; }
   panel.classList.remove('hidden');
   if (!opened) opened = new Set(programs.map(p => p.id));
-  // No ranking between programmes, and deliberately: a mile and a Status Point
-  // are not commensurable without a valuation, and a valuation is an opinion.
-  // They are listed, not scored.
+  // No ranking between programmes, on purpose. A mile and a Status Point cannot
+  // be compared without a valuation, and a valuation is an opinion. They are
+  // listed, not scored.
   $('earn').innerHTML = programs.map(earnProgram).join('');
 
   // `toggle` does not bubble, so these are wired per section rather than once on
-  // the panel. What each one records is the whole panel's state read back off the
-  // document, never a delta from the event: setting innerHTML fires a toggle on
-  // the sections it replaced as well as on the ones it created, and the two
-  // arrive in no guaranteed order, so an add-or-remove here dropped a section
-  // that was plainly open on screen. Reading the live DOM cannot disagree with
-  // it, and a stale event just recomputes the same answer.
+  // the panel. Each one records the whole panel's state read back off the
+  // document, never a change worked out from the event. Setting innerHTML fires
+  // a toggle on the sections it replaced as well as on the ones it created, and
+  // the two arrive in no guaranteed order, so adding or removing here used to
+  // drop a section that was plainly open on screen. Reading the live DOM cannot
+  // disagree with the screen, and a stale event just recomputes the same answer.
   for (const section of $('earn').querySelectorAll('details.prog')) {
     section.addEventListener('toggle', () => {
       opened = new Set([...$('earn').querySelectorAll('details.prog')]
@@ -1207,7 +1219,7 @@ function renderEarn(data) {
       else tiers.delete(sel.dataset.prog);
       refocusTier = sel.dataset.prog;
       syncUrl();
-      // Re-priced rather than marked stale: the itinerary did not change, only
+      // Re-priced rather than marked stale. The itinerary did not change, only
       // what the traveller holds, and the answer is one call away.
       if (reported) reprice();
     });
@@ -1227,7 +1239,7 @@ function earnUnavailable(message) {
 
 // The map is drawn after the report's markup is in the document, because it
 // builds real SVG nodes rather than a string. A failure here must not take the
-// report down with it: the table below says everything the map does.
+// report down with it, since the table below says everything the map does.
 function drawMap(ann) {
   const box = $('map');
   if (!box) return;
@@ -1239,9 +1251,10 @@ function drawMap(ann) {
   }
 }
 
-// Hovering a connection lights up the same airport on the map. Cheap, and the
-// alternative is counting dots along a route that crosses itself. Delegated from
-// #answer, which outlives every render of the table and the map inside it.
+// Hovering a connection lights up the same airport on the map. It is cheap, and
+// the alternative is counting dots along a route that crosses itself. It is
+// delegated from #answer, which outlives every render of the table and the map
+// inside it.
 document.getElementById('answer').addEventListener('mouseover', e => {
   const row = e.target.closest('tr[data-airport]');
   highlight(row && row.dataset.airport);
@@ -1256,19 +1269,19 @@ function highlight(code) {
   }
 }
 
-// Continents and traffic conferences are table keys in the report and read like
+// Continents and traffic conferences arrive as table keys, and they read like
 // table keys. The report carries its own table of display names — see
 // place_names/1 in json_out.pl — so this never has to guess, and never has to
-// wait for a second request to come back before the first report can render.
-// Anything the table does not cover falls back to the atom rather than to a
-// title-cased guess, which would quietly invent a name for a new continent.
+// wait for a second request before the first report can render. Anything the
+// table does not cover falls back to the raw atom rather than to a title-cased
+// guess, which would quietly invent a name for a new continent.
 function named(names, key) {
   return (names && names[key]) || key;
 }
 const namedList = (names, keys, sep) =>
   (keys || []).map(k => named(names, k)).join(sep);
 
-// Ruled rows rather than a card: the fare is a reading off the itinerary, and the
+// Ruled rows rather than a card. The fare is a reading off the itinerary, and the
 // tariff sets its own summaries as a table.
 function fareBlock(fare, ann) {
   const names = ann.names;
@@ -1295,19 +1308,19 @@ function fareBlock(fare, ann) {
   </dl>`;
 }
 
-// The rules that were broken, and nothing when none were. A verdict of VALID is
-// derived from exactly this list being empty -- verdict_of/2 has no other way to
-// reach it -- so a line here saying so restated the word above it in smaller
-// type. What a reader wants instead when the list is empty is the check
+// The rules that were broken, and nothing at all when none were. A verdict of
+// VALID comes from exactly this list being empty -- verdict_of/2 has no other
+// way to reach it -- so a line here saying so only restated the word above it in
+// smaller type. What a reader wants when the list is empty is the check
 // register, which says what was measured rather than what was not found.
 function violationList(v) {
   if (!v.length) return '';
   return `<ul class="border-t border-rule">${v.map(x => {
     const look = SEV[x.severity] || SEV.error;
-    // Citation, severity and rule id share one wrapping row above the message
-    // rather than sitting in a fixed-width rail. A rail is tidier until the word
-    // is "indeterminate", which is wider than any column worth reserving and used
-    // to overrun the message beside it.
+    // Citation, severity and rule id share one wrapping row above the message,
+    // rather than sitting in a fixed-width rail. A rail is tidier right up until
+    // the word is "indeterminate", which is wider than any column worth
+    // reserving and used to overrun the message beside it.
     return `
       <li class="border-b border-rule px-4 py-2.5 last:border-b-0">
         <div class="flex flex-wrap items-center gap-x-2 gap-y-1">
@@ -1325,13 +1338,13 @@ function violationList(v) {
 
 // The route, under the rules it broke. It reads as the evidence for the lines
 // above it -- a repeated sector, a continent entered twice, a surface gap -- and
-// that is a thing to look at while reading them rather than after scrolling past
-// the register. It used to sit above the connections table in the panel beside,
+// that is something to look at while reading them, not after scrolling past the
+// register. It used to sit above the connections table in the panel alongside,
 // which put the tallest element on the page between the reader and everything
 // printed after it.
 //
-// The box is emptied by drawMap when there is nothing to draw, so a journey with
-// no resolvable coordinates costs no space here.
+// drawMap empties the box when there is nothing to draw, so a journey with no
+// resolvable coordinates costs no space here.
 function mapBlock(ann) {
   if (!(ann.points || []).length) return '';
   return `<div id="map-block" class="border-t border-rule">
@@ -1340,10 +1353,10 @@ function mapBlock(ann) {
 }
 
 // What every rule measured, not just the ones that were broken. "Every rule this
-// input can answer is satisfied" is a claim about coverage a reader has no way to
-// audit from the verdict alone, and the number a cap was cleared by is the thing
-// a fare-construction tool is actually asked. Collapsed by default because it is
-// four times the length of the verdict it supports.
+// input can answer is satisfied" is a claim about coverage that a reader cannot
+// audit from the verdict alone, and the number a cap was cleared by is what a
+// fare-construction tool actually gets asked. It is collapsed by default because
+// it runs four times the length of the verdict it supports.
 function checkList(checks, violations) {
   if (!checks.length) {
     return violations.some(x => x.rule === 'input_error')
@@ -1381,11 +1394,12 @@ function checkList(checks, violations) {
     </details>`;
 }
 
-// How each point was classified, in the report rather than a panel of its own.
-// It is evidence for the verdict above it -- a stopover the clock and the ticket
-// disagree about is why a count came out the way it did -- and a card holding
+// How each point was classified, shown in the report rather than in a panel of
+// its own. It is evidence for the verdict above it: a stopover the clock and the
+// ticket disagree about is why a count came out the way it did. A card holding
 // one table was a border and a heading spent on saying that a table is a table.
-// Collapsed, because it answers a question asked after the verdict, not with it.
+// It is collapsed, because it answers a question asked after the verdict rather
+// than with it.
 function connections(ann) {
   const points = ann.points || [];
   if (!points.length) return '';
@@ -1421,9 +1435,9 @@ function connections(ann) {
     </details>`;
 }
 
-// Which of the two sources settled this point. Worth showing: a declaration that
-// disagrees with the clock changes the stopover count, and the report would
-// otherwise give no clue which one the verdict rests on.
+// Which of the two sources settled this point. It is worth showing, because a
+// declaration that disagrees with the clock changes the stopover count, and
+// otherwise the report gives no clue which one the verdict rests on.
 function source(p) {
   if (p.surfaceAdjacent) return 'surface sector';
   const clock = p.derivedKind === 'transfer' || p.derivedKind === 'stopover';
@@ -1453,8 +1467,8 @@ function disclosure(title, text) {
 
 // --- loading ---------------------------------------------------------------
 
-// Returns the routing string if the itinerary is given as one, so the caller knows
-// to validate that rather than the (still empty) segment table.
+// Returns the routing string if the itinerary was given as one, so the caller
+// knows to validate that rather than the still-empty segment table.
 function loadItinerary(it) {
   $('cabin').value = it.cabin || 'economy';
   $('origin').value = it.origin || '';
@@ -1487,15 +1501,15 @@ function loadItinerary(it) {
 
 const hasTimes = it => (it.segments || []).some(s => s.dep || s.arr);
 
-// The server's own reading of a routing, turned back into editable rows. The codes
-// here are resolved, so a city code comes back as its airport.
+// The server's own reading of a routing, turned back into editable rows. The
+// codes here are already resolved, so a city code comes back as its airport.
 function adoptSegments(ann) {
   if (!ann || !ann.segments) return;
   segmentsDerived = true;
-  // A class or a fare family typed against a routing survives it being
-  // re-validated. The routing regenerates every other cell and has no notation
-  // for these two, so dropping them would silently discard the only thing on
-  // the row the user actually typed.
+  // A class or a fare family typed against a routing survives that routing being
+  // validated again. The routing regenerates every other cell and has no
+  // notation for these two, so dropping them would quietly throw away the only
+  // thing on the row the user actually typed.
   const kept = rows.length === ann.segments.length ? rows : null;
   rows = ann.segments.map((s, i) => ({
     type: s.type, from: s.from || '', to: s.to || '',
@@ -1515,7 +1529,7 @@ function adoptSegments(ann) {
 
 // --- the programme list ----------------------------------------------------
 
-// Taken from the validator's own list, which is also the only thing that decides
+// Taken from the validator's own list, which is also the only thing deciding
 // what the page offers: the tiers a programme publishes, the fare families it
 // prices, and whether the segment table needs a column for them.
 function adoptPrograms(programs) {
@@ -1533,23 +1547,24 @@ function adoptPrograms(programs) {
   pendingTiers = null;
 
   // No programme prices a fare family, so the column would be a control with
-  // nothing behind it.
+  // nothing behind it at all.
   $('segtable').classList.toggle('hide-fare', FAMILIES.length === 0);
 
   render();
 }
 
-// The rows always, never the routing string: a routing has no notation for a
+// Always the rows, never the routing string. A routing has no notation for a
 // booking class and the rows carry one. Same reason as in validate().
 const reprice = () => earn(rows.length ? buildRequest() : buildRequest($('route').value.trim()));
 
 // --- colour scheme ---------------------------------------------------------
 
 // Three states. "Auto" is the default and stores nothing, so a machine that has
-// never been told otherwise keeps following the OS; the other two write a key.
-// The theme itself is one `color-scheme` declaration in app.src.css -- all this
-// does is set or clear data-theme. The pre-paint copy of the read is inline in
-// index.html, because doing it here would show one frame of the wrong theme.
+// never been told otherwise keeps following the OS. The other two write a key.
+// The theme itself is one `color-scheme` declaration in app.src.css, and all
+// this code does is set or clear data-theme. A copy of the read runs inline in
+// index.html before the first paint, because doing it here would show one frame
+// of the wrong theme.
 const THEME_KEY = 'rtw-theme';
 
 function applyTheme(choice) {
@@ -1568,7 +1583,7 @@ for (const input of document.querySelectorAll('input[name="theme"]')) {
   input.addEventListener('change', () => applyTheme(input.value));
 }
 
-// Reflect what the inline script already applied, so the control agrees with the
+// Show what the inline script already applied, so the control agrees with the
 // page it is describing.
 (() => {
   let stored = null;
@@ -1580,26 +1595,27 @@ for (const input of document.querySelectorAll('input[name="theme"]')) {
 // --- the URL ---------------------------------------------------------------
 
 // The itinerary lives in the query string, so a routing can be pasted into a
-// message and come back as a validated report. Written with replaceState rather
-// than pushState: at one entry per keystroke the back button would become an
-// undo key, which is not what anyone reaches for it expecting.
+// message and come back as a validated report. It is written with replaceState
+// rather than pushState. At one history entry per keystroke, the back button
+// would turn into an undo key, which is not what anyone reaches for it
+// expecting.
 //
 //   ?r=LHR-BA-JFK-AA-X/LAX-JL-NRT-CX-HKG-QR-LHR    the routing box, verbatim
 //   ?s=<base64url>                                 the segment table
 //   &t=s                                           the Segments tab was active
 //   &c=economy &p=adult+child                      only when not the default
 //
-// Both r and s are written when both hold something, so switching tabs to read
-// the syntax help cannot quietly drop the table from a link you then share.
+// Both r and s are written whenever both hold something, so switching tabs to
+// read the syntax help cannot quietly drop the table from a link you then share.
 const CABIN_DEFAULT = 'business';
 const PAX_DEFAULT = 'adult';
 
-// Read off the markup rather than restated here, so the two cannot drift.
+// Read off the markup rather than repeated here, so the two cannot drift apart.
 const CABINS = new Set([...$('cabin').options].map(o => o.value));
 
-// `/` is legal in a query string (RFC 3986) and the routing notation is full of
-// it. Leaving it alone is most of what keeps the URL readable, which is the
-// whole point of storing the routing rather than an opaque blob.
+// `/` is legal in a query string (RFC 3986), and the routing notation is full of
+// it. Leaving it alone is most of what keeps the URL readable, which is the whole
+// point of storing the routing rather than an opaque blob.
 const enc = v => encodeURIComponent(v).replace(/%2F/g, '/');
 
 const b64url = s =>
@@ -1610,7 +1626,7 @@ const unb64url = s =>
   new TextDecoder().decode(
     Uint8Array.from(atob(s.replace(/-/g, '+').replace(/_/g, '/')), c => c.charCodeAt(0)));
 
-// Positional rather than keyed, and trailing blanks are dropped: a keyed object
+// Positional rather than keyed, with trailing blanks dropped. A keyed object
 // would roughly double a sixteen-segment URL for no gain, since nothing but this
 // file ever reads it.
 const FIELDS = ['type', 'from', 'to', 'marketing', 'operating', 'flight', 'dep', 'arr', 'stop',
@@ -1645,11 +1661,12 @@ function decodeSegments(text) {
   });
 }
 
-// Rows filled in from a parsed routing are derived, not authored: the routing
-// regenerates them exactly, so writing them to the URL as well would bury a
-// readable ?r=LHR-BA-JFK... under two kilobytes of base64 for nothing. The flag
-// clears the moment the table is touched directly, because from then on it holds
-// something -- a date, a flight number -- the routing cannot express.
+// Rows filled in from a parsed routing are derived rather than typed. The
+// routing regenerates them exactly, so writing them to the URL as well would
+// bury a readable ?r=LHR-BA-JFK... under two kilobytes of base64 for nothing.
+// The flag clears the moment the table is touched directly, because from then on
+// it holds something the routing cannot express, such as a date or a flight
+// number.
 let segmentsDerived = false;
 let pendingPrograms = null;
 let pendingTiers = null;
@@ -1667,19 +1684,19 @@ function syncUrl() {
 
 function writeUrl() {
   const parts = [];
-  // The field wraps and may hold hand-entered breaks, which the grammar treats
-  // as separators and a URL renders as %0A. The link is meant to be legible, so
-  // the whitespace is collapsed on the way into it — this changes nothing about
-  // what gets parsed, since a run of whitespace and a single space are one
-  // separator either way.
+  // The field wraps, and may hold line breaks the reader typed. The grammar
+  // treats those as separators and a URL renders them as %0A. The link is meant
+  // to be readable, so the whitespace is collapsed on the way into it. That
+  // changes nothing about what gets parsed, since a run of whitespace and a
+  // single space are one separator either way.
   const route = $('route').value.trim().replace(/\s+/g, ' ');
   const authored = rows.length > 0 && !segmentsDerived;
   if (route) parts.push('r=' + enc(route));
   if (authored) parts.push('s=' + encodeSegments());
-  // Only for derived rows: `s` already carries these positionally when the table
-  // was authored, and writing them twice could put two answers in one link.
-  // One character per segment, so ?r=LHR-BA-JFK-AA-LHR&b=DDD stays readable --
-  // which is most of what keeps a routing link worth sharing.
+  // Only for derived rows. When the table was typed by hand, `s` already carries
+  // these positionally, and writing them twice could put two answers in one
+  // link. One character per segment, so ?r=LHR-BA-JFK-AA-LHR&b=DDD stays
+  // readable, which is most of what keeps a routing link worth sharing.
   if (!authored && rows.length) {
     const classes = positional(rows.map(r => (r.class || '').toUpperCase().slice(0, 1)));
     const families = positional(rows.map(r => familyLetter(r.family)));
@@ -1690,8 +1707,8 @@ function writeUrl() {
   if ($('cabin').value !== CABIN_DEFAULT) parts.push('c=' + enc($('cabin').value));
   if ($('pax').value !== PAX_DEFAULT) parts.push('p=' + enc($('pax').value));
   // Which programme sections are open. Every programme is priced whatever this
-  // says, so absent means all of them are open -- the common case, which
-  // therefore adds nothing to the link.
+  // says. Leaving it out means all of them are open, which is the common case,
+  // so the common case adds nothing to the link.
   if (opened && opened.size !== PROGRAMS.length) parts.push('g=' + enc([...opened].join(',')));
   if (tiers.size) parts.push('m=' + enc([...tiers].map(([id, t]) => `${id}:${t}`).join(',')));
 
@@ -1699,18 +1716,19 @@ function writeUrl() {
   history.replaceState(null, '', query ? '?' + query : location.pathname);
 }
 
-// A dash holds a gap so the string stays positional, and a run of them at the
-// end is dropped. All dashes means nothing was stated and the parameter is
-// omitted entirely.
+// A dash holds a gap so the string stays positional, and a run of dashes at the
+// end is dropped. All dashes means nothing was stated at all, and the parameter
+// is left out entirely.
 const positional = (cells) => {
   const out = cells.map(c => c || '-');
   while (out.length && out[out.length - 1] === '-') out.pop();
   return out.join('');
 };
 
-// Families are written by initial, which is unambiguous across everything any
-// registered programme publishes and is checked to be -- a two-character
-// encoding would make the parameter longer than the routing beside it.
+// Families are written by their initial. That is unambiguous across everything
+// any registered programme publishes, and the suite checks that it stays so. A
+// two-character encoding would make the parameter longer than the routing beside
+// it.
 const familyLetter = (family) =>
   family && FAMILIES.includes(family) ? family[0].toUpperCase() : '';
 
@@ -1722,8 +1740,9 @@ const familyFromLetter = (letter) =>
 function readUrl() {
   const q = new URLSearchParams(location.search);
   // Both are checked against what the control actually offers. Assigning an
-  // unknown value to a <select> leaves it empty rather than rejecting it, and an
-  // empty cabin is refused by the validator on a link that merely had a typo.
+  // unknown value to a <select> leaves it empty rather than rejecting it, and
+  // then the validator refuses an empty cabin on a link that only had a typo in
+  // it.
   if (q.has('c') && CABINS.has(q.get('c'))) $('cabin').value = q.get('c');
   if (q.has('p') && PAX[q.get('p')]) $('pax').value = q.get('p');
 
@@ -1737,22 +1756,22 @@ function readUrl() {
     catch (e) { rows = []; }
   }
 
-  // An empty `g` is a link where every section was closed, which is a state
-  // worth being able to share -- so this deliberately does not fall back to
-  // opening them all.
+  // An empty `g` means a link where every section was closed. That is a state
+  // worth being able to share, so this does not fall back to opening them all.
   if (q.has('g')) pendingPrograms = q.get('g').split(',').filter(Boolean);
-  // Checked against what each programme publishes once the list arrives, not
-  // here: a tier this page has never heard of is the validator's to refuse.
+  // These are checked against what each programme publishes once the list
+  // arrives, not here. A tier this page has never heard of is the validator's to
+  // refuse.
   if (q.has('m')) pendingTiers = q.get('m').split(',').map(p => p.split(':')).filter(p => p.length === 2);
-  // Held until the rows exist -- a routing has to be validated before there are
+  // Held until the rows exist. A routing has to be validated before there are
   // any rows for its classes to land on.
   pendingClasses = q.get('b') || null;
   pendingFamilies = q.get('f') || null;
   if (haveSegments) applyPositional();
   // A link carrying both a routing and a table carries both because the reader
-  // had both, and they agreed when it was written. Recording that keeps the
+  // had both, and the two agreed when it was written. Recording that stops the
   // first tab switch after opening the link from deriving one side from the
-  // other -- which for a table with dates on it would mean deleting them.
+  // other, which for a table with dates on it would mean deleting them.
   if (haveSegments && route) agree();
 
   const segmentsActive = haveSegments && (q.get('t') === 's' || !route);
@@ -1761,7 +1780,7 @@ function readUrl() {
   if (segmentsActive) return null;
   // A link made from the Segments tab while a routing was showing there carries
   // t=s but no s, because the rows were derived. Validating the routing rebuilds
-  // them, so the tab is switched once that has happened.
+  // them, so the tab switches once that has happened.
   if (route) {
     if (q.get('t') === 's') pendingTab = 'segments';
     return route;
@@ -1769,9 +1788,9 @@ function readUrl() {
   return undefined;
 }
 
-// The `b` and `f` parameters name a class and a family per segment, and the
-// segments they name may not exist yet: a routing has to be parsed first. So
-// they are held and applied to whatever rows end up on the page.
+// The `b` and `f` parameters name a class and a family per segment, and those
+// segments may not exist yet, because a routing has to be parsed first. So the
+// values are held and applied to whatever rows end up on the page.
 function applyPositional() {
   if (pendingClasses) {
     [...pendingClasses].forEach((c, i) => {
@@ -1821,7 +1840,7 @@ $('undo').addEventListener('click', () => {
 $('validate').addEventListener('click', () => validate());
 $('parse').addEventListener('click', readRouting);
 // Enter validates, as it did when this was a single-line input. Shift+Enter is
-// left alone so the field can still be broken across lines by hand.
+// left alone, so the field can still be broken across lines by hand.
 $('route').addEventListener('keydown', e => {
   if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); readRouting(); }
 });
@@ -1848,8 +1867,8 @@ for (const name of Object.keys(EXAMPLES)) {
   $('example').appendChild(o);
 }
 
-// An empty state that teaches the syntax rather than announcing that nothing is
-// here. It is replaced by the first report and never comes back.
+// An empty state that teaches the syntax rather than announcing that there is
+// nothing here. The first report replaces it, and it never comes back.
 $('report').innerHTML = `
   <div class="p-4">
     <p class="text-[13.5px]">Write the journey as a routing, or build it segment by segment.</p>
@@ -1865,10 +1884,10 @@ $('report').innerHTML = `
 //
 // The one modal on the page. It explains the page rather than being part of it,
 // so it has no place in the reading order, and a reader who opens it has nothing
-// else to do until they close it -- which is the case a dialog is actually for.
-// Being a native <dialog> opened with showModal(), the browser supplies the
-// inert background, the Escape key and the focus return; what is left here is
-// the button, the light-dismiss, and filling in the figures.
+// else to do until they close it. That is exactly the case a dialog is for.
+// Because it is a native <dialog> opened with showModal(), the browser supplies
+// the inert background, the Escape key and the focus return. What is left here
+// is the button, the click-outside-to-close, and filling in the figures.
 const help = $('help');
 
 $('help-open').addEventListener('click', () => help.showModal());
@@ -1876,34 +1895,34 @@ for (const el of document.querySelectorAll('#help-close, .help-dismiss')) {
   el.addEventListener('click', () => help.close());
 }
 
-// Clicking outside the box. The dialog element fills the viewport as far as hit
-// testing is concerned, so a press that lands on the dialog itself rather than
-// on anything inside it is a press on the backdrop. Checked on both press and
-// release so that a drag which began inside -- selecting a line of the text and
-// letting go past the edge -- does not read as a dismissal.
+// Clicking outside the box. As far as hit testing is concerned the dialog
+// element fills the viewport, so a press that lands on the dialog itself rather
+// than on anything inside it is a press on the backdrop. It is checked on both
+// press and release, so that a drag which began inside -- selecting a line of
+// text and letting go past the edge -- does not read as a dismissal.
 let pressedBackdrop = false;
 help.addEventListener('pointerdown', e => { pressedBackdrop = e.target === help; });
 help.addEventListener('click', e => { if (pressedBackdrop && e.target === help) help.close(); });
 
-// The routing grammar, as the validator states it, with its quoted terms turned
-// into code spans. Two places show it -- under the routing field and in the help
-// -- and both take it from here rather than from each other.
+// The routing grammar as the validator states it, with its quoted terms turned
+// into code spans. Two places show it, under the routing field and in the help,
+// and both take it from here rather than from each other.
 function syntaxHtml(d) {
   return esc(d.routeSyntax || '').replace(/&quot;([^&]+?)&quot;/g, '<code>$1</code>');
 }
 
-// Every figure in the help comes from the ruleset. The page states what the fare
-// is, which is prose and its own to write; it states no limit, no cabin and no
-// carrier of its own, for the same reason it hardcodes no rule.
+// Every figure in the help comes from the ruleset. The page says what the fare
+// is, which is prose and the page's own to write. It states no limit, no cabin
+// and no carrier of its own, for the same reason it hardcodes no rule.
 function adoptRuleset(d) {
   $('help-source').textContent = `${d.source || 'Tariff RWR2 Rule 3015'} · version ${d.version}`;
   $('help-syntax').innerHTML = syntaxHtml(d);
 
   const L = d.limits || {};
   const cabins = [...new Set((d.fareBasis || []).map(f => f.cabin))];
-  // How many traffic conferences there are, not which continents are in them:
-  // the ruleset publishes the keys and not the display names, and the page has
-  // no business title-casing `europe_middle_east` into a name of its own. The
+  // How many traffic conferences there are, not which continents are in them.
+  // The ruleset publishes the keys rather than the display names, and the page
+  // has no business title-casing `europe_middle_east` into a name of its own. A
   // report prints them properly, because a report carries its own name table.
   const conferences = new Set((d.continents || []).map(c => c.trafficConference)).size;
 
@@ -1925,10 +1944,10 @@ function adoptRuleset(d) {
     </div>`).join('');
 }
 
-// The grammar, the limits and the city table are described by the ruleset the
+// The grammar, the limits and the city table all come from the ruleset the
 // validator reports, so the page never carries a second copy of any of them to
 // fall out of date. This is also the first thing that needs the worker, so it is
-// what the page waits on: by the time it answers, the image has booted.
+// what the page waits on. By the time it answers, the image has booted.
 buttons().forEach(b => { b.disabled = true; });
 $('status').textContent = 'starting the validator…';
 
@@ -1955,24 +1974,24 @@ RTWApi.ruleset()
     $('status').textContent = '';
   });
 
-// The programme list is what the earning column, the fare-family select and the
-// picker are all built from, so the page carries no copy of any programme's
-// name, currencies or fare families.
+// The earning column, the fare-family select and the tier picker are all built
+// from the programme list, so the page carries no copy of any programme's name,
+// currencies or fare families.
 RTWApi.programs()
   .then(res => { if (res.ok) adoptPrograms(res.data.programs || []); })
   .catch(() => { /* the page still validates; it just cannot price */ });
 
 // The URL is read before anything renders, because render() is one of the things
-// that writes it back and would otherwise erase the link that was just opened.
+// that writes it back, and would otherwise erase the link that was just opened.
 // booted stays false until the form matches the URL, for the same reason.
 const linked = readUrl();
 render();
 booted = true;
 
 // A linked itinerary validates as soon as the worker is up. validate() disables
-// and re-enables the buttons itself, so it is sequenced after the ruleset call
-// rather than racing it -- otherwise whichever finished second would re-enable
-// them while the other was still working.
+// and re-enables the buttons itself, so it runs after the ruleset call rather
+// than racing it. Otherwise whichever finished second would re-enable the
+// buttons while the other was still working.
 if (linked !== undefined) {
   RTWApi.ready()
     .then(() => validate(linked || undefined, { reveal: false }))

@@ -12,13 +12,13 @@
 
     One fact per (card, zone position, reach), binding the rate list
     src/earn/kernel.pl expects. Cathay's own rows carry both currencies as fixed
-    amounts, with Asia Miles at exactly 100 times the Status Points; a partner's
-    carry fixed Status Points and Asia Miles as a percentage of the distance
-    flown.
+    amounts, with Asia Miles at exactly 100 times the Status Points.
+    A partner's rows carry fixed Status Points, and Asia Miles as a percentage of
+    the distance flown.
 
-    A zone nobody sampled has no Status Points rate at all rather than a zero.
-    That is the whole reason this file is generated with a hole in it: the kernel
-    reports an absent rate as undecided, and 0 would be a claim the observations
+    A zone nobody sampled has no Status Points rate at all, rather than a zero.
+    That is the whole reason this file is generated with holes in it. The kernel
+    reports an absent rate as undecided, and a 0 would be a claim the observations
     do not support. 106 of the 930 cells are such holes.
 
     Reach is `any` except on American's Business card, the one row in the table
@@ -967,7 +967,7 @@ cx_rate(fare(zh, economy, economy, h, all), 6, any, [rate(status_points, fixed(0
 
 %! cx_unpriced(?Card, ?Why) is nondet.
 %  A fare group the carrier defines and the sampling never reached, so it has no
-%  rate at any distance and no percentage either. Two of them, and they are a
-%  different thing from a card whose rate is simply zero.
+%  rate at any distance and no percentage either. There are two of them, and they
+%  are a different thing from a card whose rate is simply zero.
 cx_unpriced(fare(lx, economy, economy, h, all), 'Group exists in the page model but never appeared in sampling. Percentage and points both unknown').
 cx_unpriced(fare(os, economy, economy, h, all), 'Group exists in the page model but never appeared in sampling. Percentage and points both unknown').

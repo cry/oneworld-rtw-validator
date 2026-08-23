@@ -8,10 +8,10 @@
 // offline, and an upstream change arrives as a reviewable diff rather than as a
 // different answer from the same source tree.
 //
-// The earning tables have no version and no clause numbers -- unlike the fare
-// rule, which has both -- so the URL and the date each capture was read are the
-// whole of the provenance available. They are written into source.pl and travel
-// with every number this programme produces.
+// The earning tables have no version and no clause numbers, unlike the fare rule,
+// which has both. So the URL and the date each capture was read are all the
+// provenance there is. They go into source.pl and travel with every number this
+// programme produces.
 
 import fs from 'node:fs';
 import path from 'node:path';
@@ -32,8 +32,8 @@ const tiers = read('qff-tiers.json');
 const metal = read('qff-metal.json');
 
 // The fare rule's sixteen eligible carriers, and nothing else. Qantas publishes
-// earn categories for airlines an Explorer fare may not be flown on at all --
-// Air France, Emirates, WestJet -- and a table row for a carrier 4(j) excludes
+// earn categories for airlines an Explorer fare may not be flown on at all, such
+// as Air France, Emirates and WestJet. A table row for a carrier 4(j) excludes
 // is a row no itinerary this validator accepts can ever reach.
 const ELIGIBLE = ['aa', 'as', 'at', 'ay', 'ba', 'cx', 'fj', 'ib', 'jl',
                   'mh', 'nu', 'qf', 'qr', 'rj', 'ul', 'wy'];
@@ -42,9 +42,9 @@ const COLUMNS = categories.columns;
 
 // Which scope key each capture field becomes, and how src/earn/qff.pl decides
 // whether it applies to a segment. `residual` applies when no `sector` scope of
-// the same carrier did; `region` cannot be decided without the region tables,
-// so a segment that could fall either side of one is priced only where the two
-// rows agree -- see fare_bucket/4.
+// the same carrier did. `region` cannot be decided without the region tables, so
+// a segment that could fall either side of one is priced only where the two rows
+// agree. See fare_bucket/4.
 const SCOPES = {
   all: 'all',
   all_other: 'all_other',
@@ -94,8 +94,8 @@ function rows() {
 
 const { out: categoryRows, unpublished } = rows();
 
-// A class in two categories under one scope would make the earn ambiguous and
-// is far likelier to be a transcription slip than a real publication.
+// A class in two categories under one scope would make the earn ambiguous, and it
+// is far likelier to be a transcription slip than something really published.
 const seen = new Map();
 for (const [carrier, scope, letter, column] of categoryRows) {
   const key = `${carrier}/${scope}/${letter}`;
@@ -119,23 +119,23 @@ const categoriesPl = `:- module(qff_categories,
     data/earn/sources/qff-categories.json, read ${categories.fetched} from
     ${categories.source}
 
-    Which category a segment earns in, from the marketing carrier and the class
-    it is sold in. The category is then priced by data/earn/qff/bands.pl.
+    Which category a segment earns in, worked out from the marketing carrier and
+    the class it is sold in. data/earn/qff/bands.pl then prices the category.
 
-    Only the sixteen carriers Rule 3015 4(j) permits are here; Qantas publishes
+    Only the sixteen carriers Rule 3015 4(j) permits are here. Qantas publishes
     categories for airlines an Explorer fare may not be flown on at all.
 
     Rows superseded by a later effective date are dropped rather than carried,
-    because nothing yet reads an effective date -- see PLANS/05, phase 4. The
+    because nothing reads an effective date yet -- see PLANS/05, phase 4. The
     dates that were in force at the capture are recorded in source.pl.
 */
 
 %! earn_scope(?Scope, ?Kind) is nondet.
-%  How a scope is decided for a segment. \`always\` applies to everything,
-%  \`sector\` is decided from the two endpoints, \`residual\` applies when no
-%  sector scope of the same carrier did, and \`region\` needs the region tables
-%  that phase 2 adds -- until then a segment that could fall either side of one
-%  is priced only where the candidate rows agree.
+%  How a scope is decided for a segment. \`always\` applies to everything.
+%  \`sector\` is decided from the two endpoints. \`residual\` applies when no
+%  sector scope of the same carrier did. \`region\` needs the region tables that
+%  phase 2 adds; until then, a segment that could fall either side of one is
+%  priced only where the candidate rows agree.
 earn_scope(all,           always).
 earn_scope(international, sector).
 earn_scope(domestic,      sector).
@@ -158,8 +158,8 @@ qf_categories([${metal.columns.join(', ')}]).
 ${categoryRows.map(([c, s, l, col]) => `earn_category(${c}, ${s}, ${l}, ${col}).`).join('\n')}
 
 %! earn_category_unpublished(?Carrier, ?Scope, ?Reason) is nondet.
-%  A row the table names but does not fill in. It is not an absence of earn:
-%  it is an earn this table cannot state, so it must reach the reader as
+%  A row the table names but never fills in. It does not mean there is no earn.
+%  It is an earn this table cannot state, so it has to reach the reader as
 %  undecided rather than as nothing.
 ${unpublished.map(([c, s, r]) => `earn_category_unpublished(${c}, ${s}, ${quote(r)}).`).join('\n')}
 `;
@@ -203,14 +203,14 @@ const bandsPl = `:- module(qff_bands,
     The "All other flights" table: what a partner-marketed sector earns per
     one-way flight, by distance and earn category, when no region pair in the
     published table covers it. Phase 2 adds the region pairs, which take
-    precedence; these are the fallback and the only basis phase 1 resolves.
+    precedence. These bands are the fallback, and the only basis phase 1 resolves.
 
-    Base rate throughout -- no tier bonus, which is applied by the kernel from
-    data/earn/qff/tiers.pl.
+    These are base rates throughout. The tier bonus is applied by the kernel,
+    from data/earn/qff/tiers.pl.
 */
 
 %! partner_band(?Band, ?LowMiles, ?HighMiles) is nondet.
-%  Inclusive at both ends; \`inf\` is the open top of the table.
+%  Inclusive at both ends. \`inf\` is the open top of the table.
 ${bandRows.map(({ key, lower, upper }) =>
   `partner_band(${key}, ${lower}, ${upper === null ? 'inf' : upper}).`).join('\n')}
 
@@ -240,17 +240,17 @@ ${bandRows.flatMap(({ key, band }) =>
 // --- the regions and the region-pair table ---------------------------------
 
 // Every label that appears as a group heading or a row heading in
-// qff-regions.json, against what it means. Most come straight from the
-// definitions page; the rest are a city or a country standing for itself, which
-// the page leaves undefined because it does not need defining.
+// qff-regions.json, with what it means. Most come straight from the definitions
+// page. The rest are a city or a country standing for itself, which the page
+// leaves undefined because it needs no defining.
 //
-// This is the repository's *third* geography taxonomy and it has to stay its own
-// table. Qantas splits West Coast from East Coast USA/Canada, which the fare
-// rule does not; it files Santiago, Dallas and Tel Aviv as regions of their own;
-// and its "Northern Africa" reaches Kenya, Uganda, Somalia and the Seychelles.
-// data/countries.pl already had to diverge from OurAirports' continent column
-// for the same kind of reason, and aliasing one of these tables to another would
-// invent violations or invent points.
+// This is the repository's *third* geography taxonomy, and it has to stay a table
+// of its own. Qantas splits West Coast from East Coast USA/Canada, which the fare
+// rule does not. It files Santiago, Dallas and Tel Aviv as regions in their own
+// right. And its "Northern Africa" reaches Kenya, Uganda, Somalia and the
+// Seychelles. data/countries.pl already had to diverge from OurAirports'
+// continent column for much the same reason, and aliasing one of these tables to
+// another would invent either violations or points.
 const NAMED = Object.fromEntries(
   Object.entries(regionDefs.countryRegions).map(([key, r]) => [r.label, { key, countries: r.countries }])
     .concat(Object.entries(regionDefs.cityRegions).map(([key, r]) =>
@@ -260,7 +260,7 @@ const union = (...keys) => keys.flatMap((k) => regionDefs.countryRegions[k].coun
 
 const LABELS = {
   ...NAMED,
-  // Australian gateways, which the earning table groups by city rather than by
+  // Australian gateways. The earning table groups these by city rather than by
   // any region the definitions page names.
   'Sydney, Melbourne, Brisbane, Gold Coast': { key: 'sydney_melbourne_brisbane_gold_coast', places: ['syd', 'mel', 'bne', 'ool'] },
   Perth:    { key: 'perth',    places: ['per'] },
@@ -277,9 +277,10 @@ const LABELS = {
   'Los Angeles': { key: 'los_angeles', places: ['lax'] },
   'New York, Newark or Boston': { key: 'new_york_and_boston', places: ['nyc', 'bos'] },
   // The one row that says "East Coast USA" rather than "East Coast USA/Canada".
-  // Read as the American members of that list: the difference is two Canadian
-  // cities, and widening a region invents earn where narrowing it only withholds
-  // it -- the same way round data/cities.pl decides a doubtful membership.
+  // It is read as the American members of that list. The difference is two
+  // Canadian cities, and widening a region invents earn where narrowing it only
+  // withholds some. data/cities.pl settles a doubtful membership the same way
+  // round.
   'East Coast USA': { key: 'east_coast_usa', places: ['bos', 'clt', 'chi', 'mia', 'nyc', 'mco', 'was'] },
   // Countries standing for themselves.
   'Hong Kong': { key: 'hong_kong', countries: ['HK'] },
@@ -294,8 +295,8 @@ const LABELS = {
   'New Zealand or Papua New Guinea': { key: 'new_zealand_or_papua_new_guinea', countries: ['NZ', 'PG'] },
   'Hong Kong, Thailand and Japan': { key: 'hong_kong_thailand_japan', countries: ['HK', 'TH', 'JP'] },
   'Southeast Asia or Northern Africa': { key: 'southeast_asia_or_northern_africa', countries: union('southeast_asia', 'northern_africa') },
-  // Both endpoints in the USA, and then banded on distance -- the one group in
-  // the region table that is itself a mileage table.
+  // Both endpoints in the USA, and then banded on distance. It is the one group
+  // in the region table that is itself a mileage table.
   'Intra-USA Short Haul': { key: 'intra_usa', countries: ['US'] },
 };
 
@@ -351,17 +352,17 @@ const regionsPl = `:- module(qff_regions,
     ${regions.fetched} from
     ${regions.source}
 
-    The third geography taxonomy in this repository, and deliberately its own
-    table. Qantas splits West Coast from East Coast USA/Canada, which the fare
-    rule does not; it files Santiago, Dallas and Tel Aviv as regions of their
-    own; and its "Northern Africa" reaches Kenya, Uganda, Somalia and the
+    The third geography taxonomy in this repository, and a table of its own on
+    purpose. Qantas splits West Coast from East Coast USA/Canada, which the fare
+    rule does not. It files Santiago, Dallas and Tel Aviv as regions in their own
+    right. And its "Northern Africa" reaches Kenya, Uganda, Somalia and the
     Seychelles. data/countries.pl already had to diverge from OurAirports'
-    continent column for the same kind of reason. A test asserts these stay
+    continent column for much the same reason. A test asserts these stay
     separate, so a later contributor cannot tidy up by aliasing one to another.
 
     A region is a set of places, a set of countries, or both. Places are matched
-    on geo:place_key/2, so a region naming New York covers JFK, LGA, EWR and
-    SWF -- which is what the published table means by a city.
+    on geo:place_key/2, so a region naming New York covers JFK, LGA, EWR and SWF,
+    which is what the published table means by a city.
 */
 
 %! region_places(?Region, ?Places) is nondet.
@@ -376,14 +377,14 @@ ${[...usedRegions.values()].filter((r) => r.countries)
 ${[...usedRegions.values()].map((r) => `region_label(${r.key}, ${quote(label(r))}).`).join('\n')}
 
 %! region_pair(?From, ?To, ?Category, ?Rates) is nondet.
-%  "Between X and Y", so the pair is symmetric and src/earn/qff.pl tries it
-%  both ways round rather than this file listing each row twice.
+%  "Between X and Y", so the pair works both ways. src/earn/qff.pl tries it in
+%  both directions, rather than this file listing each row twice.
 ${pairRows.map(({ from, to, column, row, i }) =>
   `region_pair(${from}, ${to}, ${column},\n            [ rate(points, ${rate(row, 'points', i)}),\n              rate(status_credits, ${rate(row, 'credits', i)}) ]).`).join('\n')}
 
 %! region_pair_band(?Region, ?Band, ?Category, ?Rates) is nondet.
 %  Intra-USA Short Haul: a group of the region table that is itself banded on
-%  distance, with both endpoints in the one region. It is why route_basis/5
+%  distance, with both endpoints in the same region. It is why route_basis/5
 %  returns an opaque basis rather than "a region pair, else a band".
 ${bandPairRows.map(({ from, band, column, row, i }) =>
   `region_pair_band(${from}, ${band}, ${column},\n                 [ rate(points, ${rate(row, 'points', i)}),\n                   rate(status_credits, ${rate(row, 'credits', i)}) ]).`).join('\n')}
@@ -424,10 +425,10 @@ ${tiers.appliesOn.marketingCarrier.map((c) => `qff_tier_carrier(${c.toLowerCase(
 
 // --- Qantas' own table -----------------------------------------------------
 
-// Every region the metal table names, over the definitions already loaded for
-// the partner table plus the handful only this one uses. A composed region --
-// "Northeast Asia or Southeast Asia" -- is the union of regions defined
-// elsewhere, so the definition still lives in exactly one place.
+// Every region the metal table names, built from the definitions already loaded
+// for the partner table plus the handful only this one uses. A composed region,
+// such as "Northeast Asia or Southeast Asia", is the union of regions defined
+// elsewhere, so each definition still lives in exactly one place.
 const metalRegions = new Map();
 
 for (const [key, r] of Object.entries(metal.regions)) {
@@ -448,8 +449,8 @@ for (const [label, key] of Object.entries(metal.rowRegions)) {
     });
     continue;
   }
-  // "Europe" is defined on the definitions page as the three European regions
-  // together, so it is a union rather than a region of its own.
+  // The definitions page defines "Europe" as the three European regions
+  // together, so it is a union rather than a region in its own right.
   if (regionDefs.unions[key]) {
     metalRegions.set(key, { key, label, places: [], countries: regionCountries(key), isoRegions: [] });
     continue;
@@ -528,7 +529,8 @@ const metalPl = `:- module(qff_metal,
 
 %! metal_carrier(?Carrier) is nondet.
 %  The marketing carriers this table prices. Jetstar's rows are on the same page
-%  and are not here: an Explorer fare cannot be sold with a JQ flight number.
+%  and are not here, because an Explorer fare cannot be sold with a JQ flight
+%  number.
 metal_carrier(qf).
 
 %! metal_region_places(?Region, ?Places) is nondet.

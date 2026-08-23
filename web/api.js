@@ -2,26 +2,26 @@
 
 /* The seam between the page and the validator.
  *
- * app.js used to call four HTTP endpoints. It now calls the operations below,
- * which are the same ones, answered by Prolog running in a worker on this
+ * app.js used to call four HTTP endpoints. It now calls the operations below.
+ * They are the same operations, answered by Prolog running in a worker on this
  * machine rather than by Prolog running in a container. Replies keep the shape
  * app.js already handled -- {ok, status, data}, with the same status codes and
- * the same error bodies -- so the page's error handling did not have to be
- * rewritten to suit a new transport.
+ * the same error bodies -- so none of the page's error handling had to be
+ * rewritten for a new transport.
  *
  * There is one backend, not two. The service still serves /api/validate and the
- * rest for programmatic callers, but the page never calls them: a page that
- * chose between a local and a remote validator would have two code paths to keep
- * in step and a class of bugs that only appear on one of them.
+ * rest for callers that are not browsers, but the page never calls them. A page
+ * that chose between a local and a remote validator would have two code paths
+ * to keep in step, and a class of bugs that only show up on one of them.
  *
- * Exposed as a global to match map.js. index.html loads plain scripts.
+ * This is a global, to match map.js. index.html loads plain scripts.
  */
 
 const RTWApi = (() => {
   // Well above the 10 s the service allows itself for the same work. This is a
-  // backstop for a query that will not finish, not a performance budget: a
-  // sixteen-segment itinerary validates in about a millisecond once the worker
-  // is up.
+  // backstop for a query that will never finish, not a performance budget. Once
+  // the worker is up, a sixteen-segment itinerary validates in about a
+  // millisecond.
   const CALL_TIMEOUT_MS = 30000;
 
   let worker = null;
@@ -39,9 +39,9 @@ const RTWApi = (() => {
       clearTimeout(waiting.timer);
       waiting.resolve(reply);
     };
-    // An error here is the worker failing to start at all -- a missing file, or
-    // a browser that will not run workers from this origin. Every call in flight
-    // is waiting on a reply that is no longer coming, so they are all told.
+    // An error here means the worker failed to start at all: a missing file, or
+    // a browser that will not run workers from this origin. Every call in
+    // flight is waiting for a reply that will never come, so they all get told.
     worker.onerror = (event) => {
       failAll(event.message || 'The validator could not be started.');
     };
@@ -59,16 +59,16 @@ const RTWApi = (() => {
     }
   }
 
-  // A Prolog query cannot be interrupted from inside, so the way to stop one is
-  // to discard the worker running it. The next call starts a fresh one, which
-  // costs the boot again -- about 50 ms plus a cached fetch.
+  // A Prolog query cannot be interrupted from inside, so the only way to stop
+  // one is to throw away the worker running it. The next call starts a fresh
+  // worker, which costs the boot again: about 50 ms plus a cached fetch.
   //
-  // The fetched-once replies go with the worker that answered them. They are
-  // memoised on the promise rather than on the value, so one that was still in
-  // flight when the worker was discarded stays cached as the failure it resolved
-  // to -- and the page would then describe the ruleset and the programme list as
-  // unavailable for the rest of its life, even though the very next validate()
-  // brings a working worker up.
+  // The fetched-once replies are discarded along with the worker that answered
+  // them. They are memoised on the promise rather than on the value, so one
+  // still in flight when the worker was thrown away would stay cached as the
+  // failure it resolved to. The page would then call the ruleset and the
+  // programme list unavailable for the rest of its life, even though the very
+  // next validate() brings a working worker up.
   function restart(message) {
     if (worker) worker.terminate();
     worker = null;
@@ -90,9 +90,9 @@ const RTWApi = (() => {
   }
 
   // Neither the ruleset nor the programme list can change within a page load, so
-  // each is fetched once and shared. The ruleset doubles as the readiness signal:
-  // everything else the page does is gated on it, and by the time it answers the
-  // worker has booted the image.
+  // each is fetched once and shared. The ruleset doubles as the readiness
+  // signal: everything else the page does waits on it, and by the time it
+  // answers, the worker has booted the image.
   const once = new Map();
   function cached(op) {
     if (!once.has(op)) once.set(op, call(op, {}));

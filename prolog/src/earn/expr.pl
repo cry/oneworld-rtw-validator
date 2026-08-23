@@ -2,12 +2,12 @@
 
 /** <module> Accrual expressions.
 
-    A programme's accrual table binds a rate rather than a number, so that a
+    A programme's accrual table binds a rate rather than a number. That way a
     table of fixed integers and a table of "a percentage of flown miles" reach
     the reader down one path instead of two. Cathay needs both *inside one
-    programme* -- its own metal earns from a table and its partners earn a
-    share of the miles flown -- so this is not a hypothetical about a third
-    programme; it is the second one.
+    programme*: its own metal earns from a table, and its partners earn a share
+    of the miles flown. So this is not a guess about some future third
+    programme. It is the second one.
 
         fixed(N)          N, whatever the distance
         pct(P)            P per cent of the distance flown
@@ -20,27 +20,27 @@
 
     `none` is the one worth dwelling on. A Qantas region row can publish points
     and a dash under Status Credits, meaning the carrier serving that pair earns
-    no status currency at all. Writing that as 0 would make it add correctly and
-    read wrongly: a total of "0 Status Credits" over a journey of such sectors
-    is true, and a reader is owed the reason.
+    no status currency at all. Writing that as 0 would add up correctly and read
+    wrongly. A total of "0 Status Credits" over a journey made of such sectors
+    is true, and the reader is owed the reason for it.
 
-    Nothing here knows about a programme, a carrier or a currency -- only about
-    a rate, a distance and a rounding rule.
+    Nothing here knows about a programme, a carrier or a currency. It knows
+    about a rate, a distance and a rounding rule.
 */
 
 %! rounding(?Name, ?Goal) is nondet.
-%  How a currency's amounts come off a fraction. Declared per currency by the
-%  programme, because the programmes disagree: a percentage accrual has to land
-%  on an integer and which way it lands is the airline's choice, not ours.
+%  How a currency's amounts come off a fraction. Each programme declares this
+%  per currency, because the programmes disagree. A percentage accrual has to
+%  land on an integer, and which way it lands is the airline's choice, not ours.
 rounding(nearest, round).
 rounding(down,    floor).
 rounding(up,      ceiling).
 
 %! expr_shape(?Shape) is nondet.
-%  The name of every form eval/4 accepts. Exported so the conformance harness
-%  can assert a programme's tables contain nothing else -- a typo in a rate
-%  would otherwise fail at the first request that reached that row rather than
-%  at the build.
+%  The name of every form eval/4 accepts. It is exported so the conformance
+%  harness can assert that a programme's tables contain nothing else. Otherwise
+%  a typo in a rate would fail at the first request that reached that row,
+%  rather than at the build.
 expr_shape(fixed).
 expr_shape(pct).
 expr_shape(max).
@@ -51,7 +51,7 @@ expr_shape(none).
 %! eval(+Expr, +Miles, +Rounding, -Amount) is semidet.
 %  Amount is a non-negative integer, or `none`.
 %
-%  Rounding is applied once, at the end, rather than at each step: rounding the
+%  Rounding is applied once, at the end, rather than at each step. Rounding the
 %  arms of a max/2 separately and then comparing them can pick the smaller of
 %  the two true values, and a sum of rounded parts is not the rounded sum.
 eval(Expr, Miles, Rounding, Amount) :-
@@ -73,15 +73,15 @@ raw(sum(Es), Miles, Raw) :-
     !,
     sum_raw(Es, Miles, 0, Raw).
 
-% Written out rather than folded with a lambda: yall copies its goal and would
-% rename the Miles the arms have to be evaluated against.
+% Written out rather than folded with a lambda. yall copies its goal, which
+% would rename the Miles the arms have to be evaluated against.
 sum_raw([], _, Acc, Acc).
 sum_raw([E|T], Miles, Acc0, Raw) :-
     raw(E, Miles, R),
     ( R == none -> Acc = Acc0 ; Acc is Acc0 + R ),
     sum_raw(T, Miles, Acc, Raw).
 
-% A `none` arm is not a zero to compare against: the larger of "nothing" and a
+% A `none` arm is not a zero to compare against. The larger of "nothing" and a
 % rate is that rate, and the smaller of them is still that rate rather than
 % nothing, because a row that prices one arm has priced the pair.
 combine(How, A, B, Miles, Raw) :-

@@ -2,37 +2,35 @@
 
 /** <module> Qantas Frequent Flyer, as a kernel plugin.
 
-    Resolvers only. Every number is in data/earn/qff/, every decision about
-    sequencing is in kernel.pl, and this file is what joins the two.
+    Resolvers only. Every number lives in data/earn/qff/, every decision about
+    sequencing lives in kernel.pl, and this file joins the two.
 
-    Three route bases, in the order the published table means them to be read:
-    the named region pairs, then Intra-USA Short Haul, which is a region group
-    that is itself banded on distance, then the "All other flights" mileage
-    bands. That third case is the fallback and the second is the reason
-    route_basis/5 returns an opaque basis rather than "a region pair, else a
-    band".
+    There are three route bases, in the order the published table means them to
+    be read: the named region pairs; then Intra-USA Short Haul, a region group
+    that is itself banded on distance; then the "All other flights" mileage
+    bands. The third is the fallback, and the second is why route_basis/5
+    returns an opaque basis rather than "a region pair, else a band".
 
     Two things about the categories are worth reading before the code.
 
     *A category depends on the route as well as the class.* Five carriers
     publish different class-to-category rows for different parts of their
-    network -- Fiji Airways inside Fiji, Japan Airlines inside Japan, Malaysia
-    on its long-haul markets, SriLankan on named routes, and Qantas between its
-    own domestic and international networks. Three of those are decided by the
-    endpoints alone and are decided here. Malaysia's and SriLankan's are not,
-    and cannot be from the tables in this repository: they are scoped to
+    network: Fiji Airways inside Fiji, Japan Airlines inside Japan, Malaysia on
+    its long-haul markets, SriLankan on named routes, and Qantas between its own
+    domestic and international networks. Three of those depend only on the
+    endpoints, and are settled here. Malaysia's and SriLankan's are not, and
+    cannot be from the tables in this repository. They are scoped to
     "Australia", "the UK" and "the Middle East", which the earning-table region
-    page does not define, and inventing definitions for them would be a fifth
-    geography taxonomy made up rather than read. Where a class falls in the same
-    category on both candidate rows the answer is the same either way and is
-    given; where it does not, the segment is undecided and says which two
-    categories it is between, which is a smaller and more useful claim than
-    picking one.
+    page never defines, and inventing definitions would mean a fifth geography
+    taxonomy, made up rather than read. Where a class falls in the same category
+    on both candidate rows, the answer is the same either way and is given.
+    Where it does not, the segment is undecided and says which two categories it
+    sits between, which claims less and helps more than picking one.
 
     *A published row can be empty.* Japan Airlines' within-Japan row says points
-    are awarded on information Japan Airlines provides, and does not tabulate
-    them. That is not an absence of earn. It reaches the reader as undecided,
-    carrying the table's own words.
+    are awarded on information Japan Airlines provides, and never tabulates
+    them. That is not the same as earning nothing. It reaches the reader as
+    undecided, carrying the table's own words.
 */
 
 :- use_module('../geo').
@@ -62,8 +60,8 @@
 
 earn_kernel:earn_program(qff, 'Qantas Frequent Flyer', qff).
 
-% Points take the tier bonus and Status Credits do not, which is a fact about
-% the programme and so lives here rather than in the kernel.
+% Points take the tier bonus and Status Credits do not. That is a fact about the
+% programme, so it lives here rather than in the kernel.
 earn_kernel:currency(qff, points, 'Qantas Points',
                      [ rounding(nearest), scope(per_segment), bonus_applies(true) ]).
 earn_kernel:currency(qff, status_credits, 'Status Credits',
@@ -75,10 +73,10 @@ earn_kernel:currency(qff, status_credits, 'Status Credits',
 % except on codeshare flights operated by an airline other than Qantas or a
 % oneworld member airline."
 %
-% So the marketing carrier selects the table and the *operating* carrier decides
+% So the marketing carrier picks the table, and the *operating* carrier decides
 % whether anything is earned at all. An unnamed operator is therefore undecided
-% rather than zero -- the same field 4(j) treats as a warning, treated here as
-% the thing it actually blocks.
+% rather than zero. 4(j) treats the same missing field as a warning; here it
+% blocks the answer outright.
 earn_kernel:eligible(qff, S, _A, Outcome) :-
     Marketing = S.marketing,
     Operating = S.operating,
@@ -136,16 +134,16 @@ resolve_presumed(_, _, Categories, Why, category(Category), Why) :-
     sort(Cs, [Category]),
     !.
 % The codes this fare books into earn in more than one category. The sector is
-% priced against every one of them and the answer is the spread -- the same
-% posture the Cathay resolver takes over a class its table lists under three
-% fare brands, and the kernel path both share.
+% priced against every one of them and the answer is the spread. The Cathay
+% resolver takes the same line over a class its table lists under three fare
+% brands, and both share the kernel path.
 %
-% This used to refuse instead, and refusing was wrong twice over: a spread is
-% strictly more informative than nothing, and the case it fired on most was one
-% the fare basis had already settled -- see basis_classes/5 in
+% This used to refuse instead, and refusing was wrong twice over. A spread tells
+% the reader strictly more than nothing does, and the case it fired on most was
+% one the fare basis had already settled -- see basis_classes/5 in
 % data/booking_codes.pl, which is why it now fires rarely rather than on every
 % classless Qantas sector. It stays because a carrier can still file two codes
-% of one fare in two categories, and the next one to do it should widen an
+% of one fare in two categories, and the next carrier to do so should widen an
 % answer rather than remove one.
 resolve_presumed(_, _, Categories, Why, one_of(Buckets, Reason), null) :-
     findall(category(C), member(C-_, Categories), Buckets0),
@@ -181,9 +179,9 @@ resolve(_, _, _, _, Categories, category(Category), Basis) :-
     !,
     memberchk(Category-Scope, Categories),
     scope_label(Scope, Basis).
-% The candidate rows disagree, which happens only where one of them is scoped to
+% The candidate rows disagree. That only happens where one of them is scoped to
 % a region nothing in this repository defines -- see the module comment. Naming
-% both categories is a smaller claim than choosing one.
+% both categories claims less than choosing one.
 resolve(_, _, _, _, Categories, indeterminate(Why), null) :-
     findall(Name, ( member(C-_, Categories), category_label(C, Name) ), Names0),
     sort(Names0, Names),
@@ -192,11 +190,11 @@ resolve(_, _, _, _, Categories, indeterminate(Why), null) :-
            'This class earns in ~w depending on the route, and the carrier scopes its rows to regions the published tables do not define.',
            [List]).
 
-% Which rows of the table could describe this segment. `always` rows always can;
-% a row scoped to a pair of endpoints can when the endpoints match; the residual
-% "all other flights" row can when no endpoint-scoped row did; and a row scoped
-% to a region cannot be ruled in or out at all until phase 2, so it stays a
-% candidate and resolve/7 above decides what its presence means.
+% Which rows of the table could describe this segment. An `always` row always
+% can. A row scoped to a pair of endpoints can when the endpoints match. The
+% leftover "all other flights" row can when no endpoint-scoped row did. A row
+% scoped to a region cannot be ruled in or out at all until phase 2, so it stays
+% a candidate and resolve/7 above decides what its presence means.
 candidate_scopes(Carrier, S, Scopes) :-
     findall(Scope,
             (   earn_category(Carrier, Scope, _, _)
@@ -232,7 +230,7 @@ scope_label(long_haul,     'the long-haul markets row').
 scope_label(named_routes,  'the named-routes row').
 
 % How this programme's own terms are written in the register. The kernel treats
-% a bucket and a basis as opaque and would otherwise print the raw term.
+% a bucket and a basis as opaque, and without this it would print the raw term.
 earn_kernel:term_label(category(Category), Label) :- category_label(Category, Label).
 earn_kernel:term_label(mileage_band(_, Label), Label).
 earn_kernel:term_label(region_band(_, _, Label), Label).
@@ -258,12 +256,14 @@ category_label(first,            'First').
 % region pairs first, then the one region group that is itself banded on
 % distance, then the "All other flights" mileage bands as the fallback. This is
 % why route_basis/5 returns an opaque basis rather than "a region pair, else a
-% band" -- Intra-USA Short Haul is both at once.
-% Two tables, and which one applies is decided by who sold the ticket. Qantas
-% publishes one set of rates for its own flights and another for its partners',
-% with ten earn categories against the partner table's six, so a QF-marketed
-% sector and a BA-marketed one over the same ground earn differently and are
-% read off different pages. This is why route_basis/5 is handed the segment.
+% band": Intra-USA Short Haul is both at once.
+%
+% There are also two tables, and who sold the ticket decides which one applies.
+% Qantas publishes one set of rates for its own flights and another for its
+% partners', with ten earn categories against the partner table's six. So a
+% QF-marketed sector and a BA-marketed one over the same ground earn differently
+% and are read off different pages. This is why route_basis/5 is handed the
+% segment.
 earn_kernel:route_basis(qff, S, _A, Miles, Basis) :-
     (   metal_carrier(S.marketing)
     ->  metal_basis(S.from, S.to, Miles, Basis)
@@ -276,8 +276,9 @@ partner_basis(From, To, Miles, Basis) :-
     ;   mileage_basis(Miles, Basis)
     ).
 
-% Qantas' own table, in the order the page reads: Domestic Australia, which is
-% banded on distance; then the named pairs; then "All other" mileage bands.
+% Qantas' own table, in the order the page reads it: Domestic Australia, which
+% is banded on distance; then the named pairs; then the "All other" mileage
+% bands.
 metal_basis(From, To, Miles, Basis) :-
     (   metal_domestic_basis(From, To, Miles, Found)
     ->  Basis = Found
@@ -346,9 +347,9 @@ metal_pair_rates(RF-RT, Rates) :-
             ),
             Rates).
 
-% A place is in a metal region by city, by country, or by the state code the
-% airport table already carries -- which is what "Hawaii" needs, being a state
-% rather than either of the other two.
+% A place lands in a metal region by city, by country, or by the state code the
+% airport table already carries. That last one is what "Hawaii" needs, being a
+% state rather than a city or a country.
 in_metal_region(Airport, Region) :-
     metal_region_places(Region, Places),
     place_key(Airport, Key),
@@ -372,9 +373,9 @@ mileage_basis(Miles, Basis) :-
         Basis = indeterminate(Why)
     ).
 
-% Both endpoints inside one banded region -- Intra-USA Short Haul, and only up
-% to 750 miles. A longer intra-USA sector has no row here and falls through to
-% a named pair or to the global bands, which is what the published table does.
+% Both endpoints inside one banded region: Intra-USA Short Haul, and only up to
+% 750 miles. A longer intra-USA sector has no row here and falls through to a
+% named pair or to the global bands, which is what the published table does.
 region_basis(From, To, Miles, region_band(Region, Band, Label)) :-
     region_pair_band(Region, Band, _, _),
     in_region(From, Region),

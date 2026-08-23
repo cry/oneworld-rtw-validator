@@ -3,15 +3,15 @@
 /** <module> Serialization and HTTP round trip.
 
     The service and the CLI are two renderers over one report/3 term. These
-    tests are what stop the two drifting apart: the JSON body must carry the
+    tests are what stop the two drifting apart. The JSON body must carry the
     same verdict and the same rule ids the text renderer prints.
 */
 
 :- use_module(library(plunit)).
 :- use_module(library(http/http_open)).
-% SWI 10 moved JSON out of the HTTP package: `library(json)` does not exist on
+% SWI 10 moved JSON out of the HTTP package. `library(json)` does not exist on
 % 9.x, and `library(http/json)` prints a deprecation notice on 10.x. Asking
-% which one is present is the only spelling that is silent on both.
+% which one is present is the only way to stay quiet on both.
 :- if(exists_source(library(json))).
 :- use_module(library(json)).
 :- else.
@@ -228,13 +228,15 @@ test(malformed_body_is_a_400) :-
     assertion(Code == 400),
     assertion(D.error == invalid_request).
 
-% Bounded work per request: the declared length is refused before the body is
-% read, and the segment cap refuses a small body that would still be expensive.
-% The body is refused on its declared length, before it is read -- which is the
-% point, since reading it is the cost being avoided. A client that writes the
-% whole body before reading the response may therefore see the connection go
-% away instead of the 413; both outcomes mean refused, and the test accepts
-% either. curl and other streaming clients do receive the 413.
+% Work per request is bounded two ways. An oversized declared length is refused
+% before the body is read, and the segment cap refuses a small body that would
+% still be expensive.
+%
+% Refusing on the declared length, before reading, is the whole point: reading is
+% the cost being avoided. So a client that writes the whole body before reading
+% the response may see the connection go away instead of the 413. Both outcomes
+% mean refused, and the test accepts either. curl and other streaming clients do
+% get the 413.
 test(oversized_body_is_refused) :-
     limit(max_request_bytes, Max),
     Count is Max // 20,
@@ -257,11 +259,11 @@ test(too_many_segments_is_a_400) :-
     assertion(D.error == invalid_request).
 
 % The guard is on the declared length, so a request that declares none used to
-% walk straight past it and be read to end of stream unbounded -- and the segment
-% cap cannot stand in for it, because that is applied to a document already in
-% memory. Asserted against check_body_size/1 rather than over a socket, because
-% http_open/3 always sends a Content-Length and the wiring around it is covered
-% by the two cases above.
+% walk straight past it and be read to end of stream with no bound. The segment
+% cap cannot stand in for it, because that applies to a document already in
+% memory. This is asserted against check_body_size/1 rather than over a socket,
+% because http_open/3 always sends a Content-Length, and the two cases above
+% already cover the wiring around it.
 test(a_body_with_no_declared_length_is_refused) :-
     limit(max_request_bytes, Max),
     Under is Max - 1,
@@ -274,9 +276,9 @@ test(a_body_with_no_declared_length_is_refused) :-
     assertion(Dict.error == length_required).
 
 % A bug in a rule must not describe the validator's internals to an
-% unauthenticated caller: that is the hazard library(http/http_error) exists to
-% warn about, and it is invisible until something actually throws. The mapping
-% is checked rather than the wiring, which the 400 cases above already cover.
+% unauthenticated caller. That is the hazard library(http/http_error) exists to
+% warn about, and it stays invisible until something actually throws. This checks
+% the mapping rather than the wiring, which the 400 cases above already cover.
 test(an_internal_error_does_not_leak_the_term) :-
     Secret = error(existence_error(procedure, some_internal_predicate/3), _),
     server:error_reply(Secret, Status, Dict),
@@ -285,8 +287,8 @@ test(an_internal_error_does_not_leak_the_term) :-
     assertion(\+ sub_atom(Dict.message, _, _, _, 'some_internal_predicate')),
     assertion(\+ sub_atom(Dict.message, _, _, _, 'existence_error')).
 
-% The cases that describe the caller's own request back to them stay verbatim;
-% only the fallback is opaque.
+% The cases that describe the caller's own request back to them stay word for
+% word. Only the fallback is opaque.
 test(client_errors_keep_their_message) :-
     server:error_reply(input_error('Missing "segments" or "route".'), S1, D1),
     assertion(S1 == 400),
@@ -296,8 +298,8 @@ test(client_errors_keep_their_message) :-
     server:error_reply(request_too_large(200000, 131072), S3, _),
     assertion(S3 == 413).
 
-% Served from memory, so it cannot depend on the working directory or on a
-% path baked in at compile time -- see the note in server.pl.
+% Served from memory, so it cannot depend on the working directory or on a path
+% baked in at compile time. See the note in server.pl.
 test(the_ui_is_served_without_touching_the_filesystem) :-
     url('/', Url),
     setup_call_cleanup(
@@ -307,9 +309,10 @@ test(the_ui_is_served_without_touching_the_filesystem) :-
     assertion(Code == 200),
     assertion(sub_string(Body, _, _, _, "oneworld Explorer validator")).
 
-% The page is three files now, and a stylesheet that 404s is a UI that renders
-% as unstyled markup rather than one that fails loudly. Content types are
-% asserted too: a stylesheet served as text/plain is ignored by every browser.
+% The page is three files now, and a stylesheet that 404s gives a UI that renders
+% as unstyled markup rather than one that fails loudly. The content types are
+% asserted too, because a stylesheet served as text/plain is ignored by every
+% browser.
 test(the_page_assets_are_served) :-
     forall(member(Path-Type, [ '/app.css' - "text/css",
                                '/app.js'  - "text/javascript",
@@ -326,8 +329,8 @@ test(the_page_assets_are_served) :-
              assertion(Len > 0)
            )).
 
-% Composing a routing is a separate endpoint rather than a flag on validate,
-% because it runs no rules and answers a different question.
+% Writing a routing is its own endpoint rather than a flag on validate, because
+% it runs no rules and answers a different question.
 test(the_routing_endpoint_composes) :-
     fixture(lhr_classic, Body),
     url('/api/routing', Url),
@@ -339,7 +342,7 @@ test(the_routing_endpoint_composes) :-
     assertion(Code == 200),
     assertion(D.route == 'LHR-BA-JFK-AA-X/LAX-JL-NRT-CX-HKG-CX-BKK-QR-X/DOH-QR-LHR').
 
-% Refusing is the interesting half: the reply has to name the segments rather
+% Refusing is the interesting half. The reply has to name the segments rather
 % than invent a classification for them.
 test(the_routing_endpoint_refuses_an_undecidable_itinerary) :-
     fixture(mut_no_times, Body),
@@ -352,9 +355,10 @@ test(the_routing_endpoint_refuses_an_undecidable_itinerary) :-
     assertion(D.error == invalid_request),
     assertion(sub_atom(D.message, _, _, _, 'segments 1, 2, 3, 4, 5 and 6')).
 
-% RTW_DEV_ASSETS trades the whole point of reading the page into the program for
-% not having to restart while editing it, so the two must not be confusable: dev
-% replies are uncacheable, and production ones are not.
+% RTW_DEV_ASSETS trades away the whole point of reading the page into the program,
+% in return for not having to restart while editing it. The two must never be
+% mistaken for each other: dev replies are uncacheable, and production ones are
+% not.
 test(assets_are_cacheable_unless_dev_mode_is_on) :-
     assertion(\+ server:dev_assets),
     server:cache_control('text/css', Css),
@@ -370,10 +374,10 @@ test(assets_are_cacheable_unless_dev_mode_is_on) :-
         ),
         retract(server:dev_assets)).
 
-% The one route that writes bytes rather than text. An encoding applied on the
-% way out corrupts a woff2 without any error being raised, and the only symptom
-% is a browser silently falling back to a system font -- so the reply is compared
-% against the bytes the server holds.
+% The one route that writes bytes rather than text. An encoding applied on the way
+% out corrupts a woff2 with no error raised, and the only symptom is a browser
+% quietly falling back to a system font. So the reply is compared against the
+% bytes the server holds.
 test(a_font_arrives_byte_for_byte) :-
     Path = '/fonts/archivo-latin-var.woff2',
     server:asset(Path, _, Expected),
@@ -384,16 +388,16 @@ test(a_font_arrives_byte_for_byte) :-
           read_string(In, _, Body) ),
         close(In)),
     assertion(Code == 200),
-    % Both sides are strings of bytes: that is how the asset table holds a file,
+    % Both sides are strings of bytes. That is how the asset table holds a file,
     % and comparing them directly is what proves format/2's ~s does not re-encode
     % one on its way out.
     assertion(Body == Expected),
     % woff2 files begin with the signature 'wOF2'.
     assertion(sub_string(Body, 0, 4, _, "wOF2")).
 
-% The font handler has a prefix, so it sees every path under /fonts/. It resolves
-% nothing from disk: anything not in the table is absent, which is what keeps
-% ../../etc/passwd from being a question worth asking.
+% The font handler has a prefix, so it sees every path under /fonts/. It touches
+% no disk: anything not in the table simply does not exist, which is what makes
+% ../../etc/passwd a question not worth asking.
 test(an_unknown_asset_is_a_404) :-
     forall(member(P, ['/fonts/nothing.woff2', '/fonts/../server.pl']),
            ( url(P, Url),
