@@ -8,10 +8,11 @@ The ruleset is oneworld Explorer, Tariff RWR2 Rule 3015, version 27 FEB 26.
 [`parsed-rules-aug-2026.md`](parsed-rules-aug-2026.md) holds the transcription. Every violation
 cites the clause it came from, so you can compare any answer with that text.
 
-There are three ways to run it: a CLI, an HTTP service, and a **static page that carries the
-validator with it**. The page runs the same Prolog, compiled to WebAssembly. The browser applies the
-rules itself instead of asking a server. The page needs no server at all, and it is the version
-published to GitHub Pages. See [In the browser](#in-the-browser).
+There are four ways to run it: a CLI, an HTTP service, an **MCP server** for a model, and a
+**static page that carries the validator with it**. The page runs the same Prolog, compiled to
+WebAssembly. The browser applies the rules itself instead of asking a server. The page needs no
+server at all, and it is the version published to GitHub Pages. See
+[In the browser](#in-the-browser) and [MCP server](#mcp-server).
 
 This file is how to use it. [`DESIGN.md`](DESIGN.md) is why it is built the way it is. It covers the
 rule readings that are not obvious, the shape of the code, and the real purpose of the test suite.
@@ -47,6 +48,9 @@ swipl prolog/cli.pl -- route "NYC-BA-X/LON-QR-BKK//SIN-QF-SYD-QF-X/LAX-AA-NYC" -
 
 # what the same ticket would earn, in every registered loyalty programme
 swipl prolog/cli.pl -- earn prolog/test/fixtures/lhr_classes.json
+
+# answer a model over stdin and stdout instead of a person
+swipl prolog/mcp.pl
 ```
 
 A report names three things in order: the verdict, then every rule broken with the clause it came
@@ -438,6 +442,64 @@ To look at the static site locally, serve the directory with any static server:
 python3 -m http.server 8000 --directory web      # then http://localhost:8000/
 ```
 
+## MCP server
+
+`swipl prolog/mcp.pl` answers the [Model Context Protocol](https://modelcontextprotocol.io) over
+stdin and stdout, so a model can validate an itinerary, read back which rule it broke, fix it and
+ask again. It is a fourth front end over the same `report/5` term the CLI prints, and it holds no
+rule logic of its own. The protocol is in [`prolog/src/mcp.pl`](prolog/src/mcp.pl); the operations
+it answers are in [`prolog/src/ops.pl`](prolog/src/ops.pl), which is the same table the browser
+reaches through `wasm.pl`.
+
+Register it with any MCP client. There is no port, no socket and no configuration: the validator
+holds no credentials and reads no network, so a session is a pipe to a process that exits when the
+pipe closes.
+
+```json
+{ "mcpServers": {
+    "rtw": { "command": "swipl",
+             "args": ["/path/to/oneworld-rtw-planner/prolog/mcp.pl"] } } }
+```
+
+Seven tools, named after the operations they run, so one vocabulary covers the CLI subcommands, the
+HTTP paths, the browser ops and these.
+
+| Tool | Answers |
+|---|---|
+| `validate` | May this be sold as an Explorer fare, and if not, which rule stops it |
+| `earn` | What the ticket earns, per programme and per sector. Runs no fare rules |
+| `classes` | Which booking codes 5(b) sells this fare in, one sector at a time |
+| `routing` | The journey written as a routing |
+| `airports` | Typeahead over the airport table |
+| `ruleset` | Version, caps, carriers, city codes, routing grammar, fare basis, booking codes |
+| `programs` | The registered loyalty programmes and where each table was read |
+
+Three resources carry the same reference material for a client that reads them: `rtw://ruleset`,
+`rtw://programs`, and `rtw://rules` — the transcription of the tariff, so a citation in a violation
+can be checked against the text it points at.
+
+**A tool result is written for a reader, not for a browser.** The reply carries the `explain/3`
+text beside the report. On `lhr_classic.json` that text is 109 bytes; the same answer over
+`/api/validate` is 13,177, of which 5,742 is the coordinates and display names a page needs to draw
+a map. So the check register and the annotations are withheld unless asked for — `"checks": true`
+and `"annotations": true` — and `annotations.routing`, the one line of them worth having, is
+promoted to the top of the reply instead.
+
+**Input the caller can fix comes back as a tool result with `isError`, not as a JSON-RPC error.** A
+model can read the first and try again; the second reads to it as a broken transport. An unknown
+tool or an unknown method is a JSON-RPC error, because those are not things a model can correct.
+
+**Two eras of the protocol are answered.** Revision `2026-07-28` replaced the `initialize`
+handshake with per-request metadata and a `server/discover` method; the revisions before it still
+open with a handshake. Both work here, because which one a given client speaks is not something
+this repository gets to choose. A request naming a version the server does not answer is refused
+with the list of the ones it does.
+
+[`.claude/skills/rtw-award-planning/`](.claude/skills/rtw-award-planning/) is a skill that writes
+down the loop these tools are for: validate for a verdict and a fare basis, `classes` for the codes
+to search, an inventory search for space in those codes, then validate and earn again with the
+classes filled in.
+
 ## Deployment
 
 Deploy the service when something other than a browser needs to ask. [The HTTP API](#http-api) is
@@ -552,6 +614,7 @@ after that.
 | `POST` | `/api/validate` | itinerary JSON in, report JSON out |
 | `POST` | `/api/routing` | itinerary JSON in, `{"route": …}` out — the same journey written as a routing, no rules run |
 | `POST` | `/api/earn` | itinerary plus `programs` in, points and status currency out, no rules run |
+| `POST` | `/api/classes` | itinerary in, the booking codes 5(b) sells this fare in, per sector, no rules run |
 | `GET` | `/api/programs` | the registered loyalty programmes, their currencies, and where each table was read |
 | `GET` | `/api/ruleset` | version, limits, free-segment caps, carriers, city codes, routing grammar, continents, fare-basis and surcharge tables |
 | `GET` | `/api/airports?q=&limit=` | typeahead over the airport table, accent-folded, with coordinates |
@@ -675,12 +738,12 @@ of world time zones is a data error.
 ## Tests
 
 ```sh
-swipl -g run_tests -t halt prolog/test/run_tests.pl   # 263 tests, no node needed
+swipl -g run_tests -t halt prolog/test/run_tests.pl   # 312 tests, no node needed
 npm run test:wasm                                     # the browser build against the native one
 npm run check:contrast                                # WCAG over the palette, no browser needed
 ```
 
-There are ten suites. [`DESIGN.md`](DESIGN.md#tests) says what each one is for and which of them are
+There are eleven suites. [`DESIGN.md`](DESIGN.md#tests) says what each one is for and which of them are
 load-bearing. Every rule id has a fixture.
 
 ## Scope

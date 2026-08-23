@@ -295,11 +295,12 @@ input_dict(In, Dict) :-
 %  happen at all: there is no request body here to be too large, and no time
 %  limit, because a caller that is not a socket stops a runaway query itself.
 %
-%  The exception term travels in `detail`. server.pl hides it, because an
-%  unauthenticated caller is not owed a description of the validator's
-%  internals and it has a log to write it to instead. The two callers here run
-%  on the reader's own machine and have no such log, so this is the only place a
-%  bug found through them can be reported from.
+%  The exception term travels in `detail`. server.pl hides it and keeps its own
+%  mapping, because an unauthenticated caller over a socket is not owed a
+%  description of the validator's internals. The two callers here -- the browser
+%  and the MCP server -- run on the reader's own machine, where there is nobody
+%  else to hide it from, and where the reader is the only person who can report
+%  the bug. mcp.pl writes it to stderr as well, because it has one.
 op_error_reply(input_error(Message), 400,
                _{ error: 'invalid_request', message: Message }) :- !.
 op_error_reply(Error, 500,

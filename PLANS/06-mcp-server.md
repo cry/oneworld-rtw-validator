@@ -191,8 +191,15 @@ Three things it must get right:
   the 2.5 MB WebAssembly bundle, the 472 KB image and both fonts into the process at startup for
   nothing. `mcp.pl` loads `load.pl` and `src/ops.pl` only.
 - **Protocol version.** Check the current MCP specification when implementing and declare the
-  version actually implemented, negotiating down to what the client asks for. `2025-06-18` is the
-  floor.
+  version actually implemented, negotiating down to what the client asks for.
+
+  *As built:* the current revision is `2026-07-28`, not the `2025-06-18` this plan assumed, and it
+  is not a point release. It drops the `initialize` handshake entirely: a modern client states its
+  version in the `_meta` of every request and discovers the server through a mandatory
+  `server/discover` method. Older clients still open with a handshake. The server answers both,
+  which the specification calls dual-era, because which era a given client speaks is not something
+  this repository gets to choose. A request naming an unanswerable version is refused with code
+  `-32022` and the list of versions that would work.
 
 Tool errors come back as a result with `isError: true` and the message as text, not as a JSON-RPC
 error object. A model can read and recover from the first; the second reads as a broken transport.
@@ -232,6 +239,15 @@ unpriceable.
 against the tariff it came from. They are tools as well because resource support across clients is
 uneven, and a model needs the routing grammar before it can write a route string.
 
+*As built:* one thing this plan asked for is deliberately missing from `alternates`. The notes of
+5(b) also let a fare book a *lower cabin's* code where the cabin it paid for is not offered, and
+which column counts as lower than which is a reading of the rule rather than a row of the table.
+That reading lives in `r05_booking.pl:lower_column/2` and stays there; a second copy in `ops.pl`
+would be exactly the drift the `classes` operation exists to avoid. The three notes that are rows of
+the table — the business alternate, the First alternate and the QR Middle East exception — are
+returned. A client that wants the fall-through reads `bookingCodes` off the ruleset and falls
+through the columns itself.
+
 ## 5. The loop, written down
 
 A skill in this repo documenting the compose loop: validate for a verdict and a fare basis,
@@ -259,6 +275,20 @@ connector, so it still reads correctly with only the validator installed.
 | `prolog/test/run_tests.pl` | load the new suite |
 | `README.md`, `DESIGN.md` | as above |
 
+*As built*, four files were touched that this plan did not name, and one predicate moved:
+
+| file | why |
+|---|---|
+| `prolog/src/mcp.pl` | the protocol, split from the entry point so the suite can call it without a process on the other end of a pipe — the split `server.pl` and `daemon.pl` are already in |
+| `prolog/src/explain.pl` | `explain/3` told every reader to re-run `--checks`, which is not a thing anyone can type at this front end. It gains a `checks_hint` option and keeps the CLI wording as its default |
+| `prolog/test/test_wasm.mjs` | `classes` added to the operations diffed between the two engines |
+| `prolog/load.pl` | load the new suite under the test flag |
+
+`src/ops.pl` also gained `rtw_render/5` beside `rtw_do/3`. A tool result carries the prose and the
+report together, and `explain.pl` reads the report *term* while `json_out.pl` reads the same term,
+so a caller wanting both would otherwise validate twice and hope the runs agreed. One pipeline, two
+entry points.
+
 Untouched: every file under `prolog/src/rules/`, `prolog/src/earn/` and `prolog/data/` except the
 one addition to `json_out.pl`. No rule logic moves, and no number changes.
 
@@ -267,9 +297,12 @@ one addition to `json_out.pl`. No rule logic moves, and no number changes.
 **The refactor changed nothing.** Load-bearing, because step 1 moves code the browser depends on:
 
 ```sh
-swipl -g run_tests -t halt prolog/test/run_tests.pl   # 263 existing tests, all must still pass
-npm run build && npm run test:wasm                    # native against WebAssembly, all 54 fixtures
+swipl -g run_tests -t halt prolog/test/run_tests.pl   # existing tests, all must still pass
+npm run build && npm run test:wasm                    # native against WebAssembly, every fixture
 ```
+
+*As built:* 312 tests pass, of which 31 are new. The engine diff runs 174 replies over 58 fixtures
+× `validate`, `earn` and `classes`. The saved image grew by 2.2 KB.
 
 **The new operation agrees with the rule that reads the same table.** `test/test_mcp.pl` asserts,
 over every fixture naming a carrier, that the codes `classes` returns for a sector are the ones

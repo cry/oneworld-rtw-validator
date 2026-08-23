@@ -16,7 +16,7 @@ and an earning figure names the row and the date the table was read. The fare ru
 numbers to cite; the earning tables have neither a version nor a notice period, so the substitutes
 are built.
 
-*One implementation per fact.* Three front ends render the same report term, both directions of the
+*One implementation per fact.* Four front ends render the same report term, both directions of the
 routing grammar are in Prolog, and no cap is written anywhere but the data files.
 
 ## How it works
@@ -31,11 +31,22 @@ Three layers with one contract between them:
                                                  │  ┌───────────────────┴────────┐
                                     route_out ───┘  explain (text)        json_out (dicts)
                                         │                  │                     │
-                                    "route"              cli.pl        server.pl · wasm.pl
+                                    "route"          cli.pl · mcp.pl    server.pl · wasm.pl · mcp.pl
 ```
 
-`json_out` has two callers and neither contains rule logic: `server.pl` answers HTTP, and `wasm.pl`
-answers the browser directly. Three front ends, one `report/3`.
+`json_out` has three callers and none contains rule logic: `server.pl` answers HTTP, `wasm.pl`
+answers the browser directly, and `mcp.pl` answers a model. Four front ends, one `report/3`.
+
+`mcp.pl` is the only one that calls *both* renderers for a single answer, because a model wants the
+prose and the data at once. That is what `src/ops.pl:rtw_render/5` is for: one run of the rules,
+rendered twice, rather than two runs that might disagree.
+
+**`src/ops.pl` is the operation table, and it has two callers of its own.** `wasm.pl` had it first,
+because a saved image has no autoloading and so the browser needs a way in that names an operation
+rather than a goal. MCP needs exactly the same shape — a named operation, a dict in, a dict out —
+so the table moved down a level rather than being written twice. `server.pl` reaches it for
+`/api/classes` and answers the rest through `http_dispatch`, which had already routed those paths
+before the table existed.
 
 The two input forms meet at `build_itinerary/6` and no rule knows which was used, which is what
 makes the routing form a second front end rather than a separate, weaker validator; the test suite
@@ -635,7 +646,7 @@ the server does deliberately, each of which was a production problem:
 swipl -g run_tests -t halt prolog/test/run_tests.pl
 ```
 
-Nine suites, in descending value, plus a tenth that needs node as well and runs on its own:
+Ten suites, in descending value, plus an eleventh that needs node as well and runs on its own:
 
 1. **Mutation tests** — each fixture is the golden itinerary with exactly one rule broken, asserting
    that exactly the expected rule ids fire. This catches false negatives and rules that over-fire on
@@ -666,13 +677,21 @@ Nine suites, in descending value, plus a tenth that needs node as well and runs 
    size, segment and timeout guards, and the static assets: a stylesheet or map bundle that 404s
    leaves the UI degraded rather than failing loudly, and a font re-encoded on the way out arrives
    corrupt with no error raised, so it is compared byte for byte against what the server holds.
-8. **Earn conformance** — run over *every* registered loyalty programme, and the thing that makes
+8. **The MCP front end** — that it speaks the protocol, that a malformed itinerary comes back as a
+   tool result the model can act on while an unknown method comes back as a JSON-RPC error, and that
+   both eras of the handshake are answered. The load-bearing one is not about the protocol at all:
+   `classes` is a projection of section 5(b), which `r05_booking.pl` reads in the other direction,
+   and two readings of one table are exactly what drifts. So rather than compare the two
+   implementations — which would only assert they are the same code — every fixture is booked into
+   the classes the tool names and validated, and 5(b) is required to pass. If it ever names a class
+   the rule rejects, the search it exists to drive would be a search for space the fare cannot use.
+9. **Earn conformance** — run over *every* registered loyalty programme, and the thing that makes
    adding a third one cheap. No orphan rows and no unpriceable buckets; every declared currency
    produced by some accrual and no accrual pricing a currency nobody declared; every rate an
    expression the evaluator knows; surface sectors earning nothing; an unnamed operating carrier
    undecided rather than zero in every programme and every currency; and asking for two programmes
    at once matching asking for each on its own. Nothing in the file names a programme.
-9. **Earn numbers** — hand-computed values with the published row named in a comment above each, and
+10. **Earn numbers** — hand-computed values with the published row named in a comment above each, and
    the same mutation idea as the rule suite: change one booking class and assert exactly one column
    moves. Also the great-circle distance against four known city pairs; that a sector near a band edge
    is flagged while one in the middle of a band is not; that HKG-NRT and HKG-SIN fall in different
@@ -685,12 +704,13 @@ Nine suites, in descending value, plus a tenth that needs node as well and runs 
 npm run test:wasm
 ```
 
-10. **The two engines agree** — the page runs a different SWI-Prolog from the container (10.1.10
+11. **The two engines agree** — the page runs a different SWI-Prolog from the container (10.1.10
     against 10.0.2), and no plunit test can see that. Every fixture is driven through `rtw_call/4` on
     both, for every operation that takes an itinerary, and the **whole reply** compared field by
-    field rather than the verdict alone: message prose, ordering and evidence included. 57 fixtures
-    × `validate` and `earn` — all 114 agree. It needs both engines present, which is why it is a node
-    script rather than a unit.
+    field rather than the verdict alone: message prose, ordering and evidence included. 58 fixtures
+    × `validate`, `earn` and `classes` — all 174 agree. `classes` is the one most worth having here,
+    because a difference between the engines would show up as a search for a class the fare cannot
+    be sold in. It needs both engines present, which is why it is a node script rather than a unit.
 
 `npm run check:contrast` is separate and does not need SWI: it scores every colour pair in the
 palette against WCAG 2.2, including the 3:1 minimum for the boundary of a control.
