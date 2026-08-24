@@ -22,6 +22,12 @@ explain(Report, S) :- explain(Report, S, []).
 %  ones that failed. It is off by default because the list runs four times the
 %  length of the verdict it supports. It is available at all because otherwise
 %  "no rule was broken" is a claim the reader cannot audit.
+%
+%  `checks_hint(How)` is how the reader turns that list on, for the line that
+%  says the list was withheld. It defaults to the CLI flag, because the CLI was
+%  the only caller for a long time. A front end where `--checks` is not a thing
+%  anyone can type says so instead: a reader told to re-run with a flag their
+%  interface does not have is worse off than one told nothing.
 explain(report(Verdict, Violations, Fare, NotChecked, Checks), S, Opts) :-
     verdict_headline(Verdict, Head),
     (   tally(Violations, Tally), Tally \== ''
@@ -49,7 +55,8 @@ check_lines(Checks, _, S, Opts) :-
     (   memberchk(checks(true), Opts)
     ->  format(S, 'Checks — ~w:~n', [Tally]),
         forall(member(C, Checks), check_line(C, S))
-    ;   format(S, 'Checks — ~w. Re-run with --checks to list them.~n', [Tally])
+    ;   (   memberchk(checks_hint(How), Opts) -> true ; How = 'with --checks' ),
+        format(S, 'Checks — ~w. Re-run ~w to list them.~n', [Tally, How])
     ).
 
 check_line(check(_, Citation, Label, Outcome, Detail), S) :-

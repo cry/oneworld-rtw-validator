@@ -18,7 +18,10 @@
 // came along for free the moment it became one. Its tables, its distances and its
 // reasons for not being able to price a sector are all compared the same way, and
 // a floating-point difference between the two engines would show up here as a
-// changed mileage band rather than as a wrong number on a page.
+// changed mileage band rather than as a wrong number on a page. `classes` came
+// along the same way, and it is the one most worth having here: it reads the
+// same 5(b) table src/rules/r05_booking.pl reads, so a difference between the
+// engines would show up as a search for a class the fare cannot be sold in.
 //
 // The comparison is *structural*, not textual, and that is the whole reason this
 // file has a diff routine in it. SWI moved JSON out of the HTTP package at
@@ -49,7 +52,7 @@ const IMAGE = path.join(REPO, 'web', 'rtw.pvm');
 // then the reply. width(0) in rtw_call/4 keeps each reply on one line, which is
 // what makes a line-by-line comparison safe. Some of these messages are long
 // enough that atom_json_dict would otherwise wrap them.
-const OPS = ['validate', 'earn'];
+const OPS = ['validate', 'earn', 'classes'];
 
 const BASELINE_GOAL = `
     forall(( member(D, ['${FIXTURES}/']), atom_concat(D, '*.json', P),

@@ -27,6 +27,7 @@
 :- use_module('src/geo').
 :- use_module('src/annotate').
 :- use_module('src/validate').
+:- use_module('src/ops').
 :- use_module('src/io/json_in').
 :- use_module('src/io/json_out').
 :- use_module('src/io/earn_out').
@@ -172,6 +173,11 @@ thread_pool:create_pool(rtw_validate) :-
 % rather than the server's default workers.
 :- http_handler(root(api/earn), earn_endpoint,
                 [method(post), methods([post, options]), spawn(rtw_validate)]).
+% Which classes section 5(b) books this fare into, one sector at a time. Off the
+% validate pool with /api/routing, and for the same reason: it runs no rules,
+% only the annotation pass and a table lookup per segment.
+:- http_handler(root(api/classes), classes_endpoint,
+                [method(post), methods([post, options])]).
 
 %! server(+Port) is det.
 server(Port) :-
@@ -295,6 +301,24 @@ earn_endpoint(Request) :-
     ;   catch_with_backtrace(earn_request(Request), Error,
                              reply_error(Error, Request))
     ).
+
+% The projection of 5(b) that answers "which code do I ask an inventory system
+% for". It is its own endpoint rather than a field on the report for the reason
+% /api/routing is: it answers a different question and runs no fare rules. The
+% work is in src/ops.pl, so this endpoint and the browser cannot disagree.
+classes_endpoint(Request) :-
+    cors_enable,
+    (   memberchk(method(options), Request)
+    ->  reply_json_dict(_{}, [status(200)])
+    ;   catch_with_backtrace(classes_request(Request), Error,
+                             reply_error(Error, Request))
+    ).
+
+classes_request(Request) :-
+    check_body_size(Request),
+    http_read_json_dict(Request, Dict, [value_string_as(string)]),
+    rtw_do(classes, Dict, Json),
+    reply_json_dict(Json).
 
 earn_request(Request) :-
     check_body_size(Request),

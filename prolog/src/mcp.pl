@@ -1,0 +1,589 @@
+% src/mcp.pl -- the Model Context Protocol, as messages.
+%
+% JSON-RPC 2.0 in and out, dispatching to the operation table in src/ops.pl. A
+% fourth renderer over the same report/5 term the CLI prints, holding no rule
+% logic of its own.
+%
+% This is the module, and prolog/mcp.pl is the entry point that runs it -- the
+% same split server.pl and daemon.pl are in, and for the same two reasons. The
+% logic can be tested without a process to talk to, and the file with the
+% initialization directive in it stays small enough to read in one go.
+%
+% Three things here are not obvious.
+%
+% *Nothing but JSON-RPC may reach the output stream.* The transport is standard
+% output, so a stray write corrupts the session rather than showing up as a
+% message. src/explain.pl writes to a stream, so the text a tool result carries
+% is captured with with_output_to/2 -- in src/ops.pl, where the renderer is
+% called. Everything else -- warnings, load messages, the report of a crash --
+% goes to standard error, where SWI already sends it.
+%
+% *server.pl is deliberately not loaded.* cli.pl loads it for its `serve`
+% subcommand, and loading it reads the whole web UI into the program: a 2.5 MB
+% WebAssembly bundle, a 416 KB image and two fonts. None of that is reachable
+% from here.
+%
+% *The server answers two eras of the protocol.* Revision 2026-07-28 dropped the
+% `initialize` handshake: a modern client states its version in the `_meta` of
+% every request and may call `server/discover` first. Clients speaking the older
+% revisions still open with `initialize`. Both are answered here, which is what
+% the specification calls a dual-era server, because which era a given client
+% speaks is not something this file gets to choose.
+
+:- module(mcp,
+          [ mcp_loop/0,
+            reply_for/2,
+            tool/4,
+            resource/4,
+            resource_content/3,
+            protocol_version/1
+          ]).
+
+:- use_module(ops).
+:- use_module('earn/registry').
+:- use_module('../data/limits').
+
+:- if(exists_source(library(json))).
+:- use_module(library(json)).
+:- else.
+:- use_module(library(http/json)).
+:- endif.
+
+:- use_module(library(apply)).
+:- use_module(library(lists)).
+:- use_module(library(readutil)).
+:- use_module(library(yall)).
+
+server_name('oneworld-rtw-planner').
+server_version('1.0.0').
+
+%! protocol_version(?Version) is nondet.
+%  Newest first. The first is what an `initialize` with nothing usable in it
+%  gets back. 2026-07-28 is the revision that replaced the handshake with
+%  per-request metadata; the two below it still use one.
+protocol_version('2026-07-28').
+protocol_version('2025-11-25').
+protocol_version('2025-06-18').
+
+legacy_version('2025-11-25').
+legacy_version('2025-06-18').
+
+% --- the loop --------------------------------------------------------------
+
+%! mcp_loop is det.
+%  Read a message, answer it, repeat until the input ends. The caller sets the
+%  stream encodings; see mcp.pl.
+mcp_loop :- loop.
+
+% The session outlives any one message. A message that fails or throws where it
+% should have replied is a bug here, and it is reported and stepped over rather
+% than allowed to end a conversation that was going fine until then. Only end of
+% input stops the loop.
+loop :-
+    read_line_to_string(user_input, Line),
+    (   Line == end_of_file
+    ->  true
+    ;   (   catch(handle_line(Line), E, ( internal_error(handle_line, E), fail ))
+        ->  true
+        ;   format(user_error, 'mcp: no reply produced for a message~n', [])
+        ),
+        loop
+    ).
+
+% A line that is not JSON at all cannot be answered, because a reply needs the
+% id that was in it. The specification says to drop it; saying so on stderr is
+% the only way anyone finds out.
+handle_line(Line) :-
+    (   Line == ""
+    ->  true
+    ;   catch(atom_json_dict(Line, Msg, [value_string_as(string)]), _, fail)
+    ->  dispatch(Msg)
+    ;   format(user_error, 'mcp: ignoring a line that is not JSON~n', [])
+    ).
+
+dispatch(Msg) :-
+    (   reply_for(Msg, Reply)
+    ->  write_message(Reply)
+    ;   true
+    ).
+
+%! reply_for(+Msg, -Reply) is semidet.
+%
+%  The whole protocol, as a function from one message to one reply. It fails for
+%  a notification, which has no id and takes no reply whatever it asks for --
+%  that includes notifications/initialized, which a legacy client sends to close
+%  its handshake and which needs nothing done.
+%
+%  Nothing here reads or writes a stream, which is what lets the suite exercise
+%  every method without a process on the other end of a pipe.
+reply_for(Msg, _) :-
+    \+ get_dict(id, Msg, _), !,
+    fail.
+reply_for(Msg, Reply) :-
+    Id = Msg.id,
+    % The reader is asked for value_string_as(string), so every value in the
+    % message is a string, method names included. The clauses below are written
+    % over atoms, as the rest of this repository is.
+    (   get_dict(method, Msg, Method0)
+    ->  atom_string(Method, Method0)
+    ;   Method = ''
+    ),
+    (   get_dict(params, Msg, Params), is_dict(Params)
+    ->  true
+    ;   Params = _{}
+    ),
+    (   version_refused(Params, Supported, Requested)
+    ->  version_error(Id, Supported, Requested, Reply)
+    ;   % catch/3 fails when its goal fails, so the call is made inside an
+        % if-then-else. Without that, a method this server does not answer takes
+        % the whole loop down with it instead of drawing a -32601.
+        (   catch(method(Method, Params, Result), Error, true)
+        ->  true
+        ;   true
+        ),
+        (   nonvar(Error)
+        ->  request_error(Method, Error, Code, Message),
+            error_reply(Id, Code, Message, Reply)
+        ;   nonvar(Result)
+        ->  Reply = _{ jsonrpc: '2.0', id: Id, result: Result }
+        ;   format(atom(M), 'Method not found: ~w', [Method]),
+            error_reply(Id, -32601, M, Reply)
+        )
+    ).
+
+% A malformed request is described back to the caller, because that is
+% information they already have. Anything else is a bug here: the term and its
+% backtrace go to stderr, where whoever started the server can read them, and
+% the caller is told only that it happened. That is the same split server.pl
+% makes, for the same reason.
+request_error(_, mcp_error(Code, Message), Code, Message) :- !.
+request_error(Method, Error, -32603, 'Internal error') :-
+    internal_error(Method, Error).
+
+% A request that names a protocol version this server does not answer is
+% refused with the list it does, so the client can pick one and try again. A
+% request that names none is from a client of the older era, which settled its
+% version in the handshake and does not repeat it.
+version_refused(Params, Supported, Requested) :-
+    get_dict('_meta', Params, Meta), is_dict(Meta),
+    get_dict('io.modelcontextprotocol/protocolVersion', Meta, Requested0),
+    atom_string(Requested, Requested0),
+    \+ protocol_version(Requested),
+    findall(V, protocol_version(V), Supported).
+
+% --- methods ---------------------------------------------------------------
+
+%! method(+Method, +Params, -Result) is semidet.
+%  Fails for a method this server does not answer, which dispatch/1 turns into
+%  a -32601. It must fail rather than throw: an exception here is a bug, and the
+%  two are reported differently on purpose.
+
+% The modern opening. A client may call it first to learn what this server
+% speaks, or skip it and send a request straight away.
+method('server/discover', _, _{ resultType: complete,
+                                supportedVersions: Versions,
+                                capabilities: _{ tools: _{}, resources: _{} },
+                                instructions: Instructions,
+                                '_meta': _{ 'io.modelcontextprotocol/serverInfo':
+                                            _{ name: Name, version: Version } } }) :-
+    findall(V, protocol_version(V), Versions),
+    server_name(Name),
+    server_version(Version),
+    instructions(Instructions).
+
+% The older opening. The version asked for is echoed back when this server
+% answers it, and the newest legacy revision offered otherwise -- a client of
+% that era has no way to ask again.
+method(initialize, Params, _{ protocolVersion: Version,
+                              capabilities: _{ tools: _{}, resources: _{} },
+                              serverInfo: _{ name: Name, version: SVersion },
+                              instructions: Instructions }) :-
+    (   get_dict(protocolVersion, Params, Asked0),
+        atom_string(Asked, Asked0),
+        legacy_version(Asked)
+    ->  Version = Asked
+    ;   once(legacy_version(Version))
+    ),
+    server_name(Name),
+    server_version(SVersion),
+    instructions(Instructions).
+
+method(ping, _, _{}).
+
+method('tools/list', _, _{ resultType: complete, tools: Tools }) :-
+    findall(T, tool_json(T), Tools).
+
+method('tools/call', Params, Result) :-
+    (   get_dict(name, Params, Name0)
+    ->  atom_string(Name, Name0)
+    ;   throw(mcp_error(-32602, 'A tool call needs a "name".'))
+    ),
+    (   get_dict(arguments, Params, Args), is_dict(Args)
+    ->  true
+    ;   Args = _{}
+    ),
+    (   tool(Name, _, _, _)
+    ->  true
+    ;   format(atom(M), 'Unknown tool: ~w', [Name]),
+        throw(mcp_error(-32602, M))
+    ),
+    call_tool(Name, Args, Result).
+
+method('resources/list', _, _{ resultType: complete, resources: Resources }) :-
+    findall(R, resource_json(R), Resources).
+
+method('resources/read', Params, _{ resultType: complete, contents: [Content] }) :-
+    (   get_dict(uri, Params, Uri0)
+    ->  atom_string(Uri, Uri0)
+    ;   throw(mcp_error(-32602, 'A resource read needs a "uri".'))
+    ),
+    (   resource_content(Uri, MimeType, Text)
+    ->  Content = _{ uri: Uri, mimeType: MimeType, text: Text }
+    ;   format(atom(M), 'Unknown resource: ~w', [Uri]),
+        throw(mcp_error(-32602, M))
+    ).
+
+instructions(S) :-
+    ruleset_version(V),
+    format(atom(S),
+           'Validates a round-the-world itinerary against the oneworld Explorer fare, \c
+            Tariff RWR2 Rule 3015, version ~w, and prices what it would earn. \c
+            An itinerary is either a list of segments or a routing string such as \c
+            "NYC-BA-X/LON-QR-SIN-QF-SYD-QF-X/LAX-AA-NYC"; give one or the other, never both. \c
+            `validate` answers whether the fare may be sold and cites the clause behind every \c
+            violation. `earn` answers what the ticket is worth and runs no fare rules, because \c
+            a journey that cannot be sold can still be priced. `classes` answers which booking \c
+            codes section 5(b) sells this fare in, which is what to ask an inventory system for.',
+           [V]).
+
+% --- tools -----------------------------------------------------------------
+
+% The operation names are the tool names. One vocabulary across the CLI
+% subcommands, the HTTP paths, the browser ops and these, so a reader who has
+% seen any one of them has seen them all.
+
+%! tool(?Name, ?Title, ?Description, ?InputSchema) is nondet.
+tool(validate, 'Validate an itinerary',
+     'Decide whether an itinerary may be sold as a oneworld Explorer fare. \c
+      Returns a verdict of valid, invalid or indeterminate, every rule broken with the \c
+      clause it came from, and the fare basis. Indeterminate means the input left out \c
+      something a rule needed, not that the rule passed.',
+     Schema) :-
+    itinerary_schema(Base),
+    Extra = _{ checks: _{ type: boolean,
+                          description: 'Also return one line per rule measured, \c
+                                        including the rules that passed and by how much. \c
+                                        Off by default.' },
+               annotations: _{ type: boolean,
+                               description: 'Also return the derived geography of the \c
+                                             journey: coordinates, continent and traffic \c
+                                             conference per sector, and the kind of every \c
+                                             connection. Off by default; a reader wants the \c
+                                             routing string, which is always returned.' } },
+    add_properties(Base, Extra, Schema).
+tool(earn, 'What the ticket earns',
+     'Points, miles and status currency for an itinerary, per loyalty programme and per \c
+      sector, with the table row each figure came from. Runs no fare rules: a journey that \c
+      cannot be sold can still be priced, and a valid one can be unpriceable. A sector whose \c
+      booking class was not given comes back undecided rather than zero.',
+     Schema) :-
+    itinerary_schema(Base),
+    findall(P, earn_program_id(P), Ids),
+    Extra = _{ programs: _{ type: array,
+                            items: _{ type: string, enum: Ids },
+                            description: 'Which programmes to price. Every registered \c
+                                          programme by default. The reply carries no ranking \c
+                                          between them: comparing a mile with a status point \c
+                                          needs a valuation, and a valuation is an opinion.' } },
+    add_properties(Base, Extra, Schema).
+tool(classes, 'Which classes the fare books into',
+     'The booking codes section 5(b) sells this fare in, one sector at a time. This is what \c
+      to ask an inventory system for when searching for space the fare can actually use. \c
+      Runs no fare rules. `classes` holds the applicable codes; `alternates` holds codes the \c
+      notes allow only where something about the flight is true that an itinerary cannot show.',
+     Schema) :-
+    itinerary_schema(Schema).
+tool(routing, 'Write the journey as a routing',
+     'The same journey written in fare-construction notation, such as \c
+      "LHR-BA-JFK-AA-X/LAX-JL-NRT-CX-HKG-QR-X/DOH-QR-LHR". Runs no rules. Refuses when a \c
+      point is neither a stopover nor a transfer, because the notation has no way to write \c
+      "unknown" and a bare code already means stopover.',
+     Schema) :-
+    itinerary_schema(Schema).
+tool(airports, 'Find an airport',
+     'Search the airport table by code, city or name, accent-folded. Use it to turn a place \c
+      into the IATA code an itinerary needs, and to check a code is one the validator knows.',
+     _{ type: object,
+        properties: _{ q: _{ type: string,
+                             description: 'Code, city or airport name.' },
+                       limit: _{ type: integer,
+                                 description: 'How many matches to return. 20 by default, 100 at most.' } },
+        required: [q] }).
+tool(ruleset, 'The ruleset',
+     'Everything a client would otherwise hardcode: the ruleset version, every cap with the \c
+      clause it comes from, the eligible carriers, the metro city codes, the continents and \c
+      traffic conferences, the fare-basis table, the section 5(b) booking codes and the \c
+      premium-economy surcharge bands. Read this rather than assuming a number.',
+     _{ type: object, additionalProperties: false }).
+tool(programs, 'The loyalty programmes',
+     'The registered programmes, their currencies, which currency a status bonus reaches, \c
+      the fare families each prices, the tiers it publishes, and where every table was read \c
+      and when.',
+     _{ type: object, additionalProperties: false }).
+
+earn_program_id(P) :- earn_programs(Ids), member(P, Ids).
+
+% Both input forms, described once. Only `from` and `to` are ever required, and
+% giving both `segments` and `route` is an error rather than a preference, so
+% neither is marked required here and json_in.pl says which mistake was made.
+itinerary_schema(
+    _{ type: object,
+       properties:
+         _{ route: _{ type: string,
+                      description: 'The journey in fare-construction notation, such as \c
+                                    "NYC-BA-X/LON-QR-SIN-QF-SYD-QF-X/LAX-AA-NYC". \c
+                                    "X/" marks a transfer; a bare code is a stopover. \c
+                                    Give this or "segments", never both.' },
+            segments: _{ type: array,
+                         description: 'The journey one sector at a time. \c
+                                       Give this or "route", never both.',
+                         items:
+                           _{ type: object,
+                              properties:
+                                _{ n: _{ type: integer, description: 'Position in the journey, from 1.' },
+                                   type: _{ type: string, enum: [flight, surface],
+                                            description: 'Defaults to flight.' },
+                                   from: _{ type: string, description: 'IATA code of the departure point.' },
+                                   to: _{ type: string, description: 'IATA code of the arrival point.' },
+                                   carrier: _{ type: string,
+                                               description: 'Shorthand filling both carrier fields.' },
+                                   marketingCarrier: _{ type: string,
+                                                        description: 'Who sells the sector. Rule 5(b) reads this one. \c
+                                                                      Giving it alone leaves the operator unknown rather \c
+                                                                      than assuming there is no codeshare.' },
+                                   operatingCarrier: _{ type: string,
+                                                        description: 'Who flies the sector. Rule 4(j) reads this one.' },
+                                   flight: _{ type: string, description: 'Flight number, such as "BA117".' },
+                                   dep: _{ type: string,
+                                           description: 'Local wall-clock departure, "YYYY-MM-DDTHH:MM". \c
+                                                         A zone designator is accepted and then discarded.' },
+                                   arr: _{ type: string, description: 'Local wall-clock arrival, "YYYY-MM-DDTHH:MM".' },
+                                   stop: _{ type: string,
+                                            description: 'What the point after this sector counts as: \c
+                                                          stopover, or transfer. Worked out from the ground \c
+                                                          time when times are given.' },
+                                   bookingClass: _{ type: string,
+                                                    description: 'The single RBD letter the sector is sold in. \c
+                                                                  Leave it out when it is not known: rule 5(b) \c
+                                                                  measures the class that was booked, and a \c
+                                                                  guessed one would report a pass nobody measured.' },
+                                   fareFamily: _{ type: string, enum: [flex, essential, light],
+                                                  description: 'The branded fare. No fare rule reads it; \c
+                                                                Cathay cannot be priced to a single number without it.' } },
+                              required: [from, to] } },
+            origin: _{ type: string,
+                       description: 'IATA code the journey starts from. Defaults to the departure point of segment 1.' },
+            cabin: _{ type: string, enum: [economy, business, first],
+                      description: 'Defaults to economy.' },
+            passengers: _{ type: array,
+                           description: 'Who is travelling. Read by rule 19 only.',
+                           items: _{ type: object,
+                                     properties: _{ type: _{ type: string, enum: [adult, child, infant] },
+                                                    age: _{ type: integer } } } },
+            members: _{ type: object,
+                        description: 'Membership tier per programme, such as {"qff": {"tier": "gold"}}. \c
+                                      Read by the earning side only.' } } }).
+
+add_properties(Schema, Extra, Out) :-
+    get_dict(properties, Schema, Props),
+    put_dict(Extra, Props, Merged),
+    put_dict(properties, Schema, Merged, Out).
+
+tool_json(_{ name: Name, title: Title, description: Description, inputSchema: Schema }) :-
+    tool(Name, Title, Description, Schema).
+
+% --- calling a tool --------------------------------------------------------
+
+% A tool result carries two renderings of one answer. `content` is the text
+% src/explain.pl writes, which was written to be read once and is two orders of
+% magnitude smaller than the report it summarises. `structuredContent` is the
+% report itself, trimmed of what only a map needs.
+%
+% Input the caller can fix comes back as a result with isError, not as a
+% JSON-RPC error. A model can read the first and try again; the second reads to
+% it as a broken transport. That split is why op_error_reply/3 returns the
+% status separately from the message.
+call_tool(Op, Args, Result) :-
+    catch(( run(Op, Args, Dict, Text0)
+          ->  Status = 200
+          ;   Status = 500, op_failed_reply(Op, Dict)
+          ),
+          Error,
+          op_error_reply(Error, Status, Dict)),
+    (   Status == 200
+    ->  shape(Op, Args, Dict, Text0, Text, Structured),
+        Result = _{ resultType: complete,
+                    content: [_{ type: text, text: Text }],
+                    structuredContent: Structured,
+                    isError: false }
+    ;   Result = _{ resultType: complete,
+                    content: [_{ type: text, text: Dict.message }],
+                    isError: true },
+        (   Status == 500
+        ->  ( get_dict(detail, Dict, D) -> true ; D = 'no detail' ),
+            internal_error(Op, D)
+        ;   true
+        )
+    ).
+
+% The two operations with a renderer of their own are run through rtw_render/5,
+% which produces the text and the report from a single pass. The rest have no
+% report term behind them, so the text is written here from the dict.
+run(Op, Args, Dict, Text) :-
+    explain_options(Op, Args, Opts),
+    rtw_render(Op, Args, Opts, Dict, Text), !.
+run(Op, Args, Dict, none) :-
+    rtw_do(Op, Args, Dict).
+
+explain_options(validate, Args, Opts) :-
+    !,
+    (   flag(Args, checks)
+    ->  Opts = [checks(true)]
+    ;   Opts = [checks_hint('with "checks": true')]
+    ).
+explain_options(_, _, []).
+
+%! shape(+Tool, +Args, +Dict, +Text0, -Text, -Structured) is det.
+
+% The check register is 4,996 bytes on a seven-sector journey and answers a
+% question nobody asked unless they asked it. The annotations are another 5,742,
+% of which the part a reader can use is the one-line routing. So both come off
+% by default and the routing is promoted to the top level, which is where a
+% caller would look for it anyway.
+shape(validate, Args, Dict, Text, Text, Structured) :- !,
+    Annotations = Dict.annotations,
+    (   get_dict(routing, Annotations, R) -> Routing = R ; Routing = null ),
+    del_dict(annotations, Dict, _, Trimmed0),
+    (   flag(Args, checks) -> Trimmed1 = Trimmed0 ; del_dict(checks, Trimmed0, _, Trimmed1) ),
+    (   flag(Args, annotations)
+    ->  Structured = Trimmed1.put(_{ routing: Routing, annotations: Annotations })
+    ;   Structured = Trimmed1.put(routing, Routing)
+    ).
+shape(earn, _, Dict, Text, Text, Dict) :- !.
+shape(classes, _, Dict, _, Text, Dict) :- !,
+    with_output_to(string(Text), write_classes(Dict)).
+shape(routing, _, Dict, _, Text, Dict) :- !,
+    format(atom(Text), '~w', [Dict.route]).
+shape(airports, _, Dict, _, Text, Dict) :- !,
+    with_output_to(string(Text), write_airports(Dict)).
+shape(ruleset, _, Dict, _, Text, Dict) :- !,
+    format(atom(Text), 'oneworld Explorer, Tariff RWR2 Rule 3015, version ~w.', [Dict.version]).
+shape(programs, _, Dict, _, Text, Dict) :-
+    findall(N, ( member(P, Dict.programs), N = P.name ), Names),
+    atomic_list_concat(Names, ', ', Joined),
+    format(atom(Text), 'Registered programmes: ~w.', [Joined]).
+
+write_classes(Dict) :-
+    (   Dict.fareBasis == null
+    ->  format('Fare basis: none published; read against the ~w cabin.~n', [Dict.cabin])
+    ;   format('Fare basis: ~w; read against that column.~n', [Dict.fareBasis])
+    ),
+    forall(member(S, Dict.segments), write_class_line(S)).
+
+write_class_line(S) :-
+    (   S.reason \== null
+    ->  format('  [~w] ~w-~w  ~w~n', [S.n, S.from, S.to, S.reason])
+    ;   atomic_list_concat(S.classes, ' ', Codes),
+        findall(Text,
+                ( member(A, S.alternates),
+                  format(atom(Text), '~w (~w)', [A.code, A.note]) ),
+                Alts),
+        (   Alts == []
+        ->  format('  [~w] ~w-~w  ~w  ~w~n', [S.n, S.from, S.to, S.marketingCarrier, Codes])
+        ;   atomic_list_concat(Alts, ', ', AltText),
+            format('  [~w] ~w-~w  ~w  ~w  or ~w~n',
+                   [S.n, S.from, S.to, S.marketingCarrier, Codes, AltText])
+        )
+    ).
+
+write_airports(Dict) :-
+    (   Dict.results == []
+    ->  format('No airport matches "~w".~n', [Dict.query])
+    ;   forall(member(R, Dict.results),
+               format('~w  ~w, ~w~n', [R.iata, R.city, R.country]))
+    ).
+
+flag(Args, Key) :-
+    get_dict(Key, Args, V),
+    V == true.
+
+% --- resources -------------------------------------------------------------
+
+% The two reference documents, plus the transcription of the tariff itself.
+% They are tools as well, because a client that does not read resources would
+% otherwise have no way to reach them, and a model needs the routing grammar
+% before it can write a routing.
+resource('rtw://ruleset', 'The ruleset',
+         'Version, caps, carriers, city codes, routing grammar, fare-basis table, \c
+          section 5(b) booking codes and surcharge bands.',
+         'application/json').
+resource('rtw://programs', 'The loyalty programmes',
+         'Programmes, currencies, tiers, fare families, and the source of every table.',
+         'application/json').
+resource('rtw://rules', 'Rule 3015, transcribed',
+         'The tariff text every citation in a violation points at. Read it to check any \c
+          answer this server gives against the rule it came from.',
+         'text/markdown').
+
+resource_json(_{ uri: Uri, name: Name, title: Name, description: Description, mimeType: Mime }) :-
+    resource(Uri, Name, Description, Mime).
+
+resource_content('rtw://ruleset', 'application/json', Text) :-
+    rtw_do(ruleset, _{}, Dict),
+    atom_json_dict(Text, Dict, [as(atom), width(0)]).
+resource_content('rtw://programs', 'application/json', Text) :-
+    rtw_do(programs, _{}, Dict),
+    atom_json_dict(Text, Dict, [as(atom), width(0)]).
+resource_content('rtw://rules', 'text/markdown', Text) :-
+    rules_path(File),
+    read_file_to_string(File, Text, [encoding(utf8)]).
+
+% The path is resolved against this file at compile time rather than against the
+% working directory, so the server can be started from anywhere. server.pl reads
+% its assets at compile time as well, and for a stronger version of the same
+% reason. This one is read per request because it is 17 KB that most sessions
+% never ask for, and there is no request thread to keep off the filesystem.
+:- dynamic rules_path/1.
+
+:- prolog_load_context(directory, Dir),
+   file_directory_name(Dir, Prolog),
+   file_directory_name(Prolog, Root),
+   atomic_list_concat([Root, '/parsed-rules-aug-2026.md'], Path),
+   assertz(rules_path(Path)).
+
+% --- writing a reply -------------------------------------------------------
+
+error_reply(Id, Code, Message,
+            _{ jsonrpc: '2.0', id: Id,
+               error: _{ code: Code, message: Message } }).
+
+% -32022 is the code the specification gives this case, and the list of versions
+% is what lets the client pick one and ask again rather than give up.
+version_error(Id, Supported, Requested,
+              _{ jsonrpc: '2.0', id: Id,
+                 error: _{ code: -32022,
+                           message: 'Unsupported protocol version',
+                           data: _{ supported: Supported, requested: Requested } } }).
+
+% width(0) turns off the line breaking atom_json_dict does by default. The
+% transport is one message per line, so a newline inside a message ends it early
+% and everything after it is read as a line that is not JSON.
+write_message(Dict) :-
+    atom_json_dict(Atom, Dict, [as(atom), width(0)]),
+    format(user_output, '~w~n', [Atom]),
+    flush_output(user_output).
+
+% A bug in a rule is reported to stderr, where whoever started the server can
+% read it. It cannot go to stdout, and the caller is told only that it happened.
+internal_error(What, Error) :-
+    format(user_error, 'mcp: ~w raised ~q~n', [What, Error]).
