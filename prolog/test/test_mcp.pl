@@ -238,6 +238,18 @@ test(the_text_is_shorter_than_the_report) :-
     atom_length(Json, JsonLength),
     assertion(TextLength < JsonLength).
 
+% The two reference tools exist to be read. Returning a summary and leaving the
+% figures in structuredContent -- which has no output schema here, and which
+% clients routinely do not pass to a reader -- meant `ruleset` answered "read
+% this rather than assuming a number" with one line.
+test(the_reference_tools_carry_their_data_in_the_text) :-
+    forall(member(Name-Key, ["ruleset"-"bookingCodes", "programs"-"currencies"]),
+           ( call_tool(Name, _{}, R),
+             R.content = [C|_],
+             string_length(C.text, L),
+             assertion(L > 1000),
+             assertion(sub_string(C.text, _, _, _, Key)) )).
+
 :- end_tests(mcp_tools).
 
 % --- the resources ---------------------------------------------------------
@@ -268,6 +280,24 @@ test(the_tariff_transcription_is_the_tariff_transcription) :-
     result("resources/read", _{ uri: "rtw://rules" }, R),
     R.contents = [C|_],
     assertion(sub_string(C.text, _, _, _, "3015")).
+
+% A non-ASCII literal survived compilation. It does not when the encoding is
+% left to the locale and the process has none, which is how every MCP client
+% starts this server: each byte becomes U+FFFD at load time, so `TC1 → TC2`
+% reaches the reader as three replacement characters with nothing logged.
+% Asserting a code point rather than a rendering, because a rendering is what
+% hid it.
+test(a_non_ascii_literal_is_not_mangled_at_load_time) :-
+    atom_codes('→', Codes),
+    assertion(Codes == [0x2192]),
+    result("tools/call",
+           _{ name: "validate",
+              arguments: _{ route: "NYC-BA-X/LON-QR-SIN-QF-SYD-QF-X/LAX-AA-NYC",
+                            cabin: "business", checks: true } },
+           R),
+    R.content = [C|_],
+    assertion(sub_string(C.text, _, _, _, "TC1 → TC2")),
+    assertion(\+ sub_string(C.text, _, _, _, "�")).
 
 :- end_tests(mcp_resources).
 

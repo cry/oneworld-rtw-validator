@@ -10,6 +10,24 @@
 % Every path below is relative to this file, so the loader works from any
 % working directory. No file_search_path alias is needed.
 
+% The source files are UTF-8, and saying so is not optional. Left unsaid, the
+% encoding comes from the locale, and a process started without one reads every
+% file below as ASCII -- turning each byte of a non-ASCII literal into U+FFFD
+% at compile time. `TC1 -> TC2`, written with an arrow in r04_routing.pl, comes
+% out as three replacement characters. Nothing is logged and nothing fails: by
+% the time any code reads the atom, the damage is already compiled in.
+%
+% Not a hypothetical. The MCP SDK starts a stdio server with a filtered
+% environment -- HOME, LOGNAME, PATH, SHELL, TERM, USER, and nothing else -- so
+% `LANG` never reaches the child whatever the parent sets. Every client that
+% speaks to mcp.pl over stdio does that, which made the default way into this
+% program the broken one.
+%
+% It has to precede the loads below to cover them. Files opened at runtime are
+% already safe: the one that matters, the tariff transcription behind
+% rtw://rules, names encoding(utf8) at its own call site.
+:- set_prolog_flag(encoding, utf8).
+
 :- use_module('data/limits').
 :- use_module('data/cities').
 :- use_module('data/countries').

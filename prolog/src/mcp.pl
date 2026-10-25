@@ -324,7 +324,9 @@ tool(earn, 'Calculate points and status credits',
      'Points, miles and status currency for an itinerary, per loyalty programme and per \c
       sector, with the table row each figure came from. Runs no fare rules: a journey that \c
       cannot be sold can still be priced, and a valid one can be unpriceable. A sector whose \c
-      booking class was not given comes back undecided rather than zero.',
+      booking class was not given is priced on the class section 5(b) sells this fare in, and \c
+      the reply says which class it presumed and why; where no 5(b) row settles it, the sector \c
+      comes back undecided rather than zero.',
      Schema) :-
     itinerary_schema(Base),
     findall(P, earn_program_id(P), Ids),
@@ -515,12 +517,33 @@ shape(routing, _, Dict, _, Text, Dict) :- !,
     format(atom(Text), '~w', [Dict.route]).
 shape(airports, _, Dict, _, Text, Dict) :- !,
     with_output_to(string(Text), write_airports(Dict)).
+% These two are the reference tools, and for them the data *is* the answer --
+% there is no verdict to render and no prose that would be shorter than the
+% figures. They used to return a version line and a list of programme names,
+% with everything they exist to deliver carried only in `structuredContent`.
+% That is the field a client is least likely to show its reader: it has no
+% output schema to validate against here, and clients routinely pass only the
+% text blocks to the model. So `ruleset`, whose description says to read it
+% rather than assume a number, delivered one line and nothing to read.
+%
+% The serialized JSON goes in the text, which is also what the specification
+% asks of a tool returning structured content. `rtw://ruleset` and
+% `rtw://programs` already do exactly this; a reader should not have to know
+% that the resource carries more than the tool of the same name.
 shape(ruleset, _, Dict, _, Text, Dict) :- !,
-    format(atom(Text), 'oneworld Explorer, Tariff RWR2 Rule 3015, version ~w.', [Dict.version]).
+    json_text(Dict, Text).
 shape(programs, _, Dict, _, Text, Dict) :-
-    findall(N, ( member(P, Dict.programs), N = P.name ), Names),
-    atomic_list_concat(Names, ', ', Joined),
-    format(atom(Text), 'Registered programmes: ~w.', [Joined]).
+    json_text(Dict, Text).
+
+%! json_text(+Dict, -Text) is det.
+%  Wrapped at a width rather than written on one line: unlike the resources,
+%  which are read by whatever asked for a document, this is read by someone
+%  scanning for a number.
+%  A string rather than an atom, which is what every other renderer here
+%  produces -- `with_output_to(string(...))` throughout. The resources use
+%  `as(atom)`; nothing downstream cares, but a caller writing an assertion does.
+json_text(Dict, Text) :-
+    atom_json_dict(Text, Dict, [as(string), width(72)]).
 
 write_classes(Dict) :-
     (   Dict.fareBasis == null

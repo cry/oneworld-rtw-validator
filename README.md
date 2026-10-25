@@ -174,8 +174,11 @@ A tier the programme does not publish is refused. The alternative is a quiet pri
 cannot tell that from having no status at all.
 
 **A sector that cannot be priced never reads as zero.** A sector comes back `undecided` in three
-cases: the input gave no class, the operating carrier is unnamed, or the category depends on a
-table that is not loaded. The journey total then reads "0 Qantas Points or more (5 sectors unpriced)". A
+cases: the operating carrier is unnamed, the category depends on a table that is not loaded, or
+the input gave no class *and* no section 5(b) row settles what this fare books into on that
+carrier. Where 5(b) does settle it, a sector with no stated class is priced on the class the fare
+is sold in, and the reply names the presumption and the row behind it rather than making it
+silently. The journey total then reads "0 Qantas Points or more (5 sectors unpriced)". A
 smaller number would look complete. A rate that a table publishes as a dash is a third thing again.
 It reads "no Status Credits", which is a fact rather than a gap.
 

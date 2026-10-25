@@ -47,8 +47,16 @@ COPY prolog/load.pl prolog/mcp.pl ./prolog/
 # own directory two levels up, which is why it lands at the root of /app.
 COPY parsed-rules-aug-2026.md ./
 
+# LANG is set explicitly because the MCP SDK starts a stdio server with a
+# filtered environment -- HOME, LOGNAME, PATH, SHELL, TERM, USER, and nothing
+# else -- so the image's own LANG never reaches the child. SWI then has no
+# locale, and on Debian that means its default encoding is ASCII. load.pl pins
+# the source encoding itself, which is the real fix and the one that also
+# protects a client running mcp.pl directly; this restores what the image
+# intended for everything else a locale decides.
 RUN printf '%s\n' \
-    '{"mcpServers": {"rtw": {"command": "swipl", "args": ["/app/prolog/mcp.pl"]}}}' \
+    '{"mcpServers": {"rtw": {"command": "swipl", "args": ["/app/prolog/mcp.pl"],' \
+    '                        "env": {"LANG": "C.UTF-8"}}}}' \
     > /app/mcp.json
 
 # Fail the build rather than the first request, the same bargain the other
