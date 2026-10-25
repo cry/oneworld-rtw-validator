@@ -295,8 +295,14 @@ instructions(S) :-
 % subcommands, the HTTP paths, the browser ops and these, so a reader who has
 % seen any one of them has seen them all.
 
+% A title names the action, starting with the verb: it is what a client shows
+% in a list beside other servers' tools, where `The ruleset` reads as a
+% sentence fragment about nothing in particular and `Get fare rules, caps and
+% reference tables` says what calling it does. The description is the place for
+% prose. The server name supplies the subject, so a title does not repeat it.
+
 %! tool(?Name, ?Title, ?Description, ?InputSchema) is nondet.
-tool(validate, 'Validate an itinerary',
+tool(validate, 'Validate itinerary against the fare rules',
      'Decide whether an itinerary may be sold as a oneworld Explorer fare. \c
       Returns a verdict of valid, invalid or indeterminate, every rule broken with the \c
       clause it came from, and the fare basis. Indeterminate means the input left out \c
@@ -314,7 +320,7 @@ tool(validate, 'Validate an itinerary',
                                              connection. Off by default; a reader wants the \c
                                              routing string, which is always returned.' } },
     add_properties(Base, Extra, Schema).
-tool(earn, 'What the ticket earns',
+tool(earn, 'Calculate points and status credits',
      'Points, miles and status currency for an itinerary, per loyalty programme and per \c
       sector, with the table row each figure came from. Runs no fare rules: a journey that \c
       cannot be sold can still be priced, and a valid one can be unpriceable. A sector whose \c
@@ -329,21 +335,21 @@ tool(earn, 'What the ticket earns',
                                           between them: comparing a mile with a status point \c
                                           needs a valuation, and a valuation is an opinion.' } },
     add_properties(Base, Extra, Schema).
-tool(classes, 'Which classes the fare books into',
+tool(classes, 'List permitted booking classes per sector',
      'The booking codes section 5(b) sells this fare in, one sector at a time. This is what \c
       to ask an inventory system for when searching for space the fare can actually use. \c
       Runs no fare rules. `classes` holds the applicable codes; `alternates` holds codes the \c
       notes allow only where something about the flight is true that an itinerary cannot show.',
      Schema) :-
     itinerary_schema(Schema).
-tool(routing, 'Write the journey as a routing',
+tool(routing, 'Write journey as a fare-construction routing',
      'The same journey written in fare-construction notation, such as \c
       "LHR-BA-JFK-AA-X/LAX-JL-NRT-CX-HKG-QR-X/DOH-QR-LHR". Runs no rules. Refuses when a \c
       point is neither a stopover nor a transfer, because the notation has no way to write \c
       "unknown" and a bare code already means stopover.',
      Schema) :-
     itinerary_schema(Schema).
-tool(airports, 'Find an airport',
+tool(airports, 'Search airports by code, city or name',
      'Search the airport table by code, city or name, accent-folded. Use it to turn a place \c
       into the IATA code an itinerary needs, and to check a code is one the validator knows.',
      _{ type: object,
@@ -352,13 +358,13 @@ tool(airports, 'Find an airport',
                        limit: _{ type: integer,
                                  description: 'How many matches to return. 20 by default, 100 at most.' } },
         required: [q] }).
-tool(ruleset, 'The ruleset',
+tool(ruleset, 'Get fare rules, caps and reference tables',
      'Everything a client would otherwise hardcode: the ruleset version, every cap with the \c
       clause it comes from, the eligible carriers, the metro city codes, the continents and \c
       traffic conferences, the fare-basis table, the section 5(b) booking codes and the \c
       premium-economy surcharge bands. Read this rather than assuming a number.',
      _{ type: object, additionalProperties: false }).
-tool(programs, 'The loyalty programmes',
+tool(programs, 'List loyalty programmes and their tables',
      'The registered programmes, their currencies, which currency a status bonus reaches, \c
       the fare families each prices, the tiers it publishes, and where every table was read \c
       and when.',
