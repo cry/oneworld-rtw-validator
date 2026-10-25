@@ -201,6 +201,17 @@ Three things it must get right:
   this repository gets to choose. A request naming an unanswerable version is refused with code
   `-32022` and the list of versions that would work.
 
+  *Later, and the reason to distrust "it works" here:* declaring an era obliges the server to the
+  whole of it. On `2026-07-28` a cacheable result must carry `ttlMs` and `cacheScope` as well as
+  the `resultType` this file already emitted, and without them a client that negotiated that era
+  rejects `tools/list` while parsing it — which surfaces at the far end as a server with no tools,
+  not as a protocol error. It went unnoticed because era negotiation hid it: over plain stdio a
+  client settles on `2025-11-25`, where none of the three fields is in the contract and the stray
+  `resultType` is ignored. Only once the server sat behind a proxy did both ends claim the newest
+  era and use it. `cacheable/2` in `src/mcp.pl` now holds all three in one place, and
+  `test_mcp.pl` asserts them on each of the four cacheable methods — and asserts their *absence*
+  on a tool result, which is not cacheable and is given no ttl by that revision.
+
 Tool errors come back as a result with `isError: true` and the message as text, not as a JSON-RPC
 error object. A model can read and recover from the first; the second reads as a broken transport.
 `ops:error_reply/3` already produces the message: 400 becomes the text, 500 becomes the fixed
@@ -283,6 +294,7 @@ connector, so it still reads correctly with only the validator installed.
 | `prolog/src/explain.pl` | `explain/3` told every reader to re-run `--checks`, which is not a thing anyone can type at this front end. It gains a `checks_hint` option and keeps the CLI wording as its default |
 | `prolog/test/test_wasm.mjs` | `classes` added to the operations diffed between the two engines |
 | `prolog/load.pl` | load the new suite under the test flag |
+| `Dockerfile.mcp`, `Dockerfile.mcp.dockerignore` | later: an image serving this front end over HTTP, for a caller on another host. `mcp.pl` runs as a child of a FastMCP proxy — a transport shim with no schema in it. The alternative was writing streamable-HTTP in Prolog, which is protocol code this repository would then own and test, and the shim is a config file. It needs its own ignore file because the shared one excludes `parsed-rules-aug-2026.md`, which the HTTP image has no reader for and this one serves as `rtw://rules` |
 
 `src/ops.pl` also gained `rtw_render/5` beside `rtw_do/3`. A tool result carries the prose and the
 report together, and `explain.pl` reads the report *term* while `json_out.pl` reads the same term,

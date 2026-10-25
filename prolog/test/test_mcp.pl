@@ -111,6 +111,30 @@ test(ping_is_answered) :-
     result("ping", _{}, R),
     assertion(is_dict(R)).
 
+% 2026-07-28 requires ttlMs and cacheScope on a cacheable result, beside the
+% resultType every result carries. Emitting resultType alone was enough to make
+% a client that negotiated the era reject tools/list outright -- and because the
+% rejection happens in the parser, the far end sees a server with no tools
+% rather than a protocol error. Cheap to assert, silent to lose.
+test(a_cacheable_result_carries_the_freshness_directives_as_well) :-
+    forall(member(M-P, ["server/discover"-_{},
+                        "tools/list"-_{},
+                        "resources/list"-_{},
+                        "resources/read"-_{ uri: "rtw://ruleset" }]),
+           ( result(M, P, R),
+             assertion(R.resultType == complete),
+             assertion(integer(R.ttlMs)),
+             assertion(memberchk(R.cacheScope, [public, private])) )).
+
+% A tool result is not cacheable and the revision gives it no ttl, so the two
+% must not appear here. The pair travels with `resultType` easily enough that
+% adding them everywhere is the obvious wrong fix.
+test(a_tool_result_is_not_cacheable) :-
+    call_tool("ruleset", _{}, R),
+    assertion(R.resultType == complete),
+    assertion(\+ get_dict(ttlMs, R, _)),
+    assertion(\+ get_dict(cacheScope, R, _)).
+
 :- end_tests(mcp_protocol).
 
 % --- the tools -------------------------------------------------------------

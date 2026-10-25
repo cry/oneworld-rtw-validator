@@ -1,0 +1,35 @@
+# Build context for Dockerfile.mcp. BuildKit reads `<dockerfile>.dockerignore`
+# in preference to `.dockerignore`, which is why this file exists rather than a
+# shared one: that one excludes parsed-rules-aug-2026.md, because the HTTP image
+# has no reader for it, and this image serves it as the rtw://rules resource.
+#
+# The COPY lines name what they want, so this is defence in depth plus a smaller
+# context. The whole web UI goes, which is most of the repository by size --
+# nothing reachable from mcp.pl touches it.
+.git
+.gitignore
+.claude
+PLANS
+README.md
+DESIGN.md
+prolog/test
+Dockerfile
+.dockerignore
+Dockerfile.mcp.dockerignore
+*.log
+httpd.log
+
+# The three front ends this image does not serve, and the UI they serve.
+prolog/server.pl
+prolog/daemon.pl
+prolog/cli.pl
+prolog/wasm.pl
+web
+
+# The UI toolchain and the generators.
+node_modules
+package.json
+package-lock.json
+.impeccable.md
+prolog/tools
+prolog/data/earn/sources

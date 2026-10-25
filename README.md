@@ -495,6 +495,32 @@ open with a handshake. Both work here, because which one a given client speaks i
 this repository gets to choose. A request naming a version the server does not answer is refused
 with the list of the ones it does.
 
+Answering an era means answering all of it. On `2026-07-28` a cacheable result — `tools/list`,
+`resources/list`, `resources/read`, `server/discover` — must carry `ttlMs` and `cacheScope` beside
+the `resultType` every result carries, and a client that negotiated that era rejects the whole
+reply without them. Both are set, to 0 and `private`: immediately stale, and never served out of a
+shared cache to a different caller. Nothing answered here is per-caller and the tariff is fixed for
+the life of the process, so a longer ttl would be sound; this is the conservative floor rather than
+a tuned one.
+
+### Over a network
+
+There is no HTTP transport here, and a client that needs one should put a proxy in front rather
+than wait for a second implementation of the protocol. [`Dockerfile.mcp`](Dockerfile.mcp) is that
+proxy: an image that runs `mcp.pl` as a child process and serves streamable-HTTP on port 8000. It
+restates no schema and names no operation — the bridge is a config file, not code — so there is
+nothing in it to drift from the seven tools above.
+
+```sh
+docker build -f Dockerfile.mcp -t rtw-mcp .
+docker run --rm -p 8000:8000 rtw-mcp
+```
+
+It authenticates nobody, deliberately. It is meant to sit on an internal network behind a gateway
+that authenticates the caller, which is where this one runs. Do not publish it directly — not
+because the validator is dangerous, since it holds no credentials and reads no network, but because
+an unauthenticated endpoint is an invitation to spend your CPU on someone else's itineraries.
+
 [`.claude/skills/rtw-award-planning/`](.claude/skills/rtw-award-planning/) is a skill that writes
 down the loop these tools are for: validate for a verdict and a fare basis, `classes` for the codes
 to search, an inventory search for space in those codes, then validate and earn again with the

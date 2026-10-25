@@ -173,6 +173,35 @@ version_refused(Params, Supported, Requested) :-
 
 % --- methods ---------------------------------------------------------------
 
+%! cacheable(+Result0, -Result) is det.
+%  Add the freshness directives 2026-07-28 requires on a cacheable result.
+%
+%  That revision made `resultType` mandatory on every result, and on the
+%  cacheable ones -- server/discover, tools/list, resources/list and
+%  resources/read -- `ttlMs` and `cacheScope` mandatory beside it. `resultType`
+%  alone does not satisfy it: a client that negotiated the era rejects the whole
+%  reply over the two missing keys, and because the rejection happens while
+%  parsing tools/list it surfaces at the far end as a server with no tools
+%  rather than as a protocol error.
+%
+%  Which is how this was found. Over plain stdio a client settles on 2025-11-25,
+%  where none of the three fields is in the contract and the stray resultType is
+%  ignored; behind a proxy it negotiates the newest era both ends claim, and
+%  this server claims this one.
+%
+%  tools/call is deliberately not in that set. It carries `resultType` -- also
+%  required there -- but a tool result is not cacheable and the revision gives
+%  it no ttl.
+%
+%  0 milliseconds means immediately stale, and `private` forbids a shared cache
+%  from serving one caller's reply to another. Both are the conservative
+%  reading. Nothing answered here is per-caller and the tariff is fixed for the
+%  life of the process, so a real ttl would be sound -- but that is a policy
+%  decision, and this is the correctness floor.
+cacheable(Result0, Result) :-
+    put_dict(_{ resultType: complete, ttlMs: 0, cacheScope: private },
+             Result0, Result).
+
 %! method(+Method, +Params, -Result) is semidet.
 %  Fails for a method this server does not answer, which dispatch/1 turns into
 %  a -32601. It must fail rather than throw: an exception here is a bug, and the
@@ -180,16 +209,17 @@ version_refused(Params, Supported, Requested) :-
 
 % The modern opening. A client may call it first to learn what this server
 % speaks, or skip it and send a request straight away.
-method('server/discover', _, _{ resultType: complete,
-                                supportedVersions: Versions,
-                                capabilities: _{ tools: _{}, resources: _{} },
-                                instructions: Instructions,
-                                '_meta': _{ 'io.modelcontextprotocol/serverInfo':
-                                            _{ name: Name, version: Version } } }) :-
+method('server/discover', _, Result) :-
     findall(V, protocol_version(V), Versions),
     server_name(Name),
     server_version(Version),
-    instructions(Instructions).
+    instructions(Instructions),
+    cacheable(_{ supportedVersions: Versions,
+                 capabilities: _{ tools: _{}, resources: _{} },
+                 instructions: Instructions,
+                 '_meta': _{ 'io.modelcontextprotocol/serverInfo':
+                             _{ name: Name, version: Version } } },
+              Result).
 
 % The older opening. The version asked for is echoed back when this server
 % answers it, and the newest legacy revision offered otherwise -- a client of
@@ -210,8 +240,9 @@ method(initialize, Params, _{ protocolVersion: Version,
 
 method(ping, _, _{}).
 
-method('tools/list', _, _{ resultType: complete, tools: Tools }) :-
-    findall(T, tool_json(T), Tools).
+method('tools/list', _, Result) :-
+    findall(T, tool_json(T), Tools),
+    cacheable(_{ tools: Tools }, Result).
 
 method('tools/call', Params, Result) :-
     (   get_dict(name, Params, Name0)
@@ -229,10 +260,11 @@ method('tools/call', Params, Result) :-
     ),
     call_tool(Name, Args, Result).
 
-method('resources/list', _, _{ resultType: complete, resources: Resources }) :-
-    findall(R, resource_json(R), Resources).
+method('resources/list', _, Result) :-
+    findall(R, resource_json(R), Resources),
+    cacheable(_{ resources: Resources }, Result).
 
-method('resources/read', Params, _{ resultType: complete, contents: [Content] }) :-
+method('resources/read', Params, Result) :-
     (   get_dict(uri, Params, Uri0)
     ->  atom_string(Uri, Uri0)
     ;   throw(mcp_error(-32602, 'A resource read needs a "uri".'))
@@ -241,7 +273,8 @@ method('resources/read', Params, _{ resultType: complete, contents: [Content] })
     ->  Content = _{ uri: Uri, mimeType: MimeType, text: Text }
     ;   format(atom(M), 'Unknown resource: ~w', [Uri]),
         throw(mcp_error(-32602, M))
-    ).
+    ),
+    cacheable(_{ contents: [Content] }, Result).
 
 instructions(S) :-
     ruleset_version(V),

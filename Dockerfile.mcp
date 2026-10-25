@@ -1,0 +1,81 @@
+# The MCP front end, over HTTP.
+#
+#   docker build -f Dockerfile.mcp -t rtw-mcp .
+#   docker run --rm -p 8000:8000 rtw-mcp
+#
+# `Dockerfile` beside this one serves the HTTP API and the web UI out of
+# server.pl. This one serves mcp.pl, which is a different front end answering a
+# different protocol, so it is a separate image rather than a second command on
+# that one: it needs neither the WebAssembly bundle nor the fonts, and loading
+# server.pl would read all of it into the process for nothing.
+#
+# mcp.pl speaks JSON-RPC on stdin and stdout. A client that reaches it over a
+# network needs streamable-HTTP instead, so the process that listens is a
+# FastMCP proxy which starts mcp.pl as a child and relays. That is a transport
+# shim and nothing else -- no schema is restated here, no operation is named,
+# and `fastmcp run` over an MCPConfig means there is no code to drift. The cost
+# is a Python runtime in an image that is otherwise Prolog; the alternative was
+# writing the HTTP transport in Prolog, which is protocol code this repository
+# would then own and test.
+
+FROM swipl:10.0.2
+
+# tini reaps zombies and forwards signals, and here it earns its place rather
+# than being a safety net: the listener spawns swipl per session, and without an
+# init those children accumulate as zombies.
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends tini \
+ && rm -rf /var/lib/apt/lists/*
+
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
+
+# Pinned to the same release the gateway in front of this runs, so a protocol
+# disagreement between the two legs is not something that can appear on its own
+# between deploys.
+ENV UV_PYTHON_INSTALL_DIR=/opt/uv-python
+RUN uv venv --python 3.13 /opt/bridge \
+ && VIRTUAL_ENV=/opt/bridge uv pip install --no-cache "fastmcp==4.1.3"
+
+WORKDIR /app
+
+# Data changes rarely, rules change often. server.pl, daemon.pl, cli.pl and web/
+# are all deliberately absent -- nothing here reaches them.
+COPY prolog/data ./prolog/data
+COPY prolog/src  ./prolog/src
+COPY prolog/load.pl prolog/mcp.pl ./prolog/
+# Read per request by the rtw://rules resource, resolved against src/mcp.pl's
+# own directory two levels up, which is why it lands at the root of /app.
+COPY parsed-rules-aug-2026.md ./
+
+RUN printf '%s\n' \
+    '{"mcpServers": {"rtw": {"command": "swipl", "args": ["/app/prolog/mcp.pl"]}}}' \
+    > /app/mcp.json
+
+# Fail the build rather than the first request, the same bargain the other
+# Dockerfile makes. This goes further than loading the program: it drives a real
+# handshake and a real tools/list through the pipe, because the failure this
+# catches is a stray write to stdout, which loading alone would not show.
+RUN printf '%s\n' \
+      '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"build","version":"0"}}}' \
+      '{"jsonrpc":"2.0","id":2,"method":"tools/list"}' \
+    | swipl /app/prolog/mcp.pl \
+    | python3 -c 'import json,sys; [json.loads(l) for l in sys.stdin if l.strip()] or sys.exit("no reply")'
+
+RUN useradd --uid 10001 --no-create-home --shell /usr/sbin/nologin rtw \
+ && chown -R root:root /app && chmod -R a=rX /app
+USER 10001
+
+# Nothing under /app is written, but uv and fastmcp both want a home to cache
+# in. /tmp keeps the container runnable with --read-only.
+ENV HOME=/tmp
+ENV PATH="/opt/bridge/bin:$PATH"
+
+EXPOSE 8000
+
+# No auth and no TLS: this listens on an internal Docker network, reachable only
+# by the gateway, which is what authenticates the caller. There is nothing to
+# authorize anyway -- the validator holds no credentials and reads no network.
+ENTRYPOINT ["/usr/bin/tini", "--", \
+            "fastmcp", "run", "/app/mcp.json", \
+            "--transport", "http", "--host", "0.0.0.0", "--port", "8000", \
+            "--path", "/mcp", "--no-banner"]
