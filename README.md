@@ -514,6 +514,9 @@ nothing in it to drift from the seven tools above.
 ```sh
 docker build -f Dockerfile.mcp -t rtw-mcp .
 docker run --rm -p 8000:8000 rtw-mcp
+
+# or, on the deployment host, onto an existing `proxy` network
+docker compose -f docker-compose.mcp.yml up -d --build
 ```
 
 It authenticates nobody, deliberately. It is meant to sit on an internal network behind a gateway

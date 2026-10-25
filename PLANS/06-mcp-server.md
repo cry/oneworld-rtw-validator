@@ -294,6 +294,7 @@ connector, so it still reads correctly with only the validator installed.
 | `prolog/src/explain.pl` | `explain/3` told every reader to re-run `--checks`, which is not a thing anyone can type at this front end. It gains a `checks_hint` option and keeps the CLI wording as its default |
 | `prolog/test/test_wasm.mjs` | `classes` added to the operations diffed between the two engines |
 | `prolog/load.pl` | load the new suite under the test flag |
+| `docker-compose.mcp.yml` | later: the deployment, named rather than default because `Dockerfile` is the other thing this repository deploys as |
 | `Dockerfile.mcp`, `Dockerfile.mcp.dockerignore` | later: an image serving this front end over HTTP, for a caller on another host. `mcp.pl` runs as a child of a FastMCP proxy — a transport shim with no schema in it. The alternative was writing streamable-HTTP in Prolog, which is protocol code this repository would then own and test, and the shim is a config file. It needs its own ignore file because the shared one excludes `parsed-rules-aug-2026.md`, which the HTTP image has no reader for and this one serves as `rtw://rules` |
 
 `src/ops.pl` also gained `rtw_render/5` beside `rtw_do/3`. A tool result carries the prose and the

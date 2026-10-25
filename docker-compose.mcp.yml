@@ -1,0 +1,35 @@
+# The MCP front end, behind a gateway.
+#
+#   docker compose -f docker-compose.mcp.yml up -d --build
+#
+# Named rather than plain `docker-compose.yml` because it is one of two things
+# this repository can be deployed as, and the other -- the HTTP API and web UI
+# out of `Dockerfile` -- is the one someone reaching for the default would
+# expect. The -f is the price of not guessing which you meant.
+#
+# No ports, no Traefik labels and no router: the only thing that can reach this
+# is the gateway, over the internal proxy network, and the gateway is what
+# authenticates the caller. Nothing here holds a credential, so there is no
+# .env and no volume.
+services:
+  rtw-mcp:
+    build:
+      context: .
+      dockerfile: Dockerfile.mcp
+    container_name: rtw-mcp
+    restart: unless-stopped
+    # Nothing under /app is written and the validator keeps no state.
+    read_only: true
+    tmpfs:
+      - /tmp
+    # A pathological itinerary is a runaway Prolog query, and this limit is the
+    # reason the validator runs in its own container rather than as a stdio
+    # child of the gateway: there it would be consuming the process that holds
+    # every caller's OAuth.
+    mem_limit: 768m
+    networks:
+      - proxy
+
+networks:
+  proxy:
+    external: true
