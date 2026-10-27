@@ -8,7 +8,7 @@
 # expect. The -f is the price of not guessing which you meant.
 #
 # No ports, no Traefik labels and no router: the only thing that can reach this
-# is the gateway, over the internal proxy network, and the gateway is what
+# is the gateway, over the internal `sensitive` network, and the gateway is what
 # authenticates the caller. Nothing here holds a credential, so there is no
 # .env and no volume.
 services:
@@ -28,8 +28,17 @@ services:
     # every caller's OAuth.
     mem_limit: 768m
     networks:
-      - proxy
+      - sensitive
 
 networks:
-  proxy:
+  # The high-sensitivity plane: the gateway, its five MCP backends, and the
+  # ledger server. Deliberately NOT `proxy` -- that network also carries the
+  # web UIs, the exporters and nzbget, and anything on it can open an
+  # unauthenticated MCP session to any backend, skipping the gateway's Google
+  # sign-in, email allowlist, blocklist and audit log entirely. nzbget is the
+  # one that matters: it unpacks untrusted archives from usenet.
+  #
+  # Created out of band so that no one stack owns it:
+  #   docker network create --driver bridge sensitive
+  sensitive:
     external: true
