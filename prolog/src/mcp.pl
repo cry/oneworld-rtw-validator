@@ -258,7 +258,8 @@ method('tools/call', Params, Result) :-
     ;   format(atom(M), 'Unknown tool: ~w', [Name]),
         throw(mcp_error(-32602, M))
     ),
-    call_tool(Name, Args, Result).
+    tool_operation(Name, Args, Op, OpArgs),
+    call_tool(Op, OpArgs, Result).
 
 method('resources/list', _, Result) :-
     findall(R, resource_json(R), Resources),
@@ -283,17 +284,34 @@ instructions(S) :-
             Tariff RWR2 Rule 3015, version ~w, and prices what it would earn. \c
             An itinerary is either a list of segments or a routing string such as \c
             "NYC-BA-X/LON-QR-SIN-QF-SYD-QF-X/LAX-AA-NYC"; give one or the other, never both. \c
-            `validate` answers whether the fare may be sold and cites the clause behind every \c
-            violation. `earn` answers what the ticket is worth and runs no fare rules, because \c
-            a journey that cannot be sold can still be priced. `classes` answers which booking \c
-            codes section 5(b) sells this fare in, which is what to ask an inventory system for.',
+            Call `itinerary` with `op` to choose the question: `validate` answers whether the \c
+            fare may be sold and cites the clause behind every violation; `earn` answers what \c
+            the ticket is worth and runs no fare rules, because a journey that cannot be sold \c
+            can still be priced; `classes` answers which booking codes section 5(b) sells \c
+            this fare in, which is what to ask an inventory system for; `routing` rewrites \c
+            the journey in fare-construction notation.',
            [V]).
 
 % --- tools -----------------------------------------------------------------
 
-% The operation names are the tool names. One vocabulary across the CLI
-% subcommands, the HTTP paths, the browser ops and these, so a reader who has
-% seen any one of them has seen them all.
+% The operation names are the tool names, with one exception that earns itself.
+% One vocabulary across the CLI subcommands, the HTTP paths, the browser ops and
+% these, so a reader who has seen any one of them has seen them all.
+%
+% The exception: `validate`, `earn`, `classes` and `routing` take the SAME
+% input -- itinerary_schema/1, below -- and MCP has no way to say so. Every tool
+% in `tools/list` carries its own full copy of its schema, so four tools meant
+% four copies of a 1,806-byte `segments` description: 7.2 KB, more than a tenth
+% of everything the gateway this sits behind sends to every conversation that
+% connects, whether or not an itinerary is ever mentioned.
+%
+% So those four are one tool, `itinerary`, and the operation moves into a
+% required `op` parameter. The vocabulary survives as the enum values -- `op`
+% is the word the browser side already uses -- and the three tools with input of
+% their own (airports, ruleset, programs) are unaffected and stay named after
+% their operations. Underneath, nothing changed: tool_operation/4 turns the tool
+% call back into an operation and call_tool/3 is reached exactly as before, so
+% the CLI, the HTTP paths and these still run the same four code paths.
 
 % A title names the action, starting with the verb: it is what a client shows
 % in a list beside other servers' tools, where `The ruleset` reads as a
@@ -302,55 +320,60 @@ instructions(S) :-
 % prose. The server name supplies the subject, so a title does not repeat it.
 
 %! tool(?Name, ?Title, ?Description, ?InputSchema) is nondet.
-tool(validate, 'Validate itinerary against the fare rules',
-     'Decide whether an itinerary may be sold as a oneworld Explorer fare. \c
-      Returns a verdict of valid, invalid or indeterminate, every rule broken with the \c
-      clause it came from, and the fare basis. Indeterminate means the input left out \c
-      something a rule needed, not that the rule passed.',
-     Schema) :-
-    itinerary_schema(Base),
-    Extra = _{ checks: _{ type: boolean,
-                          description: 'Also return one line per rule measured, \c
-                                        including the rules that passed and by how much. \c
-                                        Off by default.' },
-               annotations: _{ type: boolean,
-                               description: 'Also return the derived geography of the \c
-                                             journey: coordinates, continent and traffic \c
-                                             conference per sector, and the kind of every \c
-                                             connection. Off by default; a reader wants the \c
-                                             routing string, which is always returned.' } },
-    add_properties(Base, Extra, Schema).
-tool(earn, 'Calculate points and status credits',
-     'Points, miles and status currency for an itinerary, per loyalty programme and per \c
-      sector, with the table row each figure came from. Runs no fare rules: a journey that \c
-      cannot be sold can still be priced, and a valid one can be unpriceable. A sector whose \c
-      booking class was not given is priced on the class section 5(b) sells this fare in, and \c
-      the reply says which class it presumed and why; where no 5(b) row settles it, the sector \c
-      comes back undecided rather than zero.',
-     Schema) :-
-    itinerary_schema(Base),
-    findall(P, earn_program_id(P), Ids),
-    Extra = _{ programs: _{ type: array,
-                            items: _{ type: string, enum: Ids },
-                            description: 'Which programmes to price. Every registered \c
-                                          programme by default. The reply carries no ranking \c
-                                          between them: comparing a mile with a status point \c
-                                          needs a valuation, and a valuation is an opinion.' } },
-    add_properties(Base, Extra, Schema).
-tool(classes, 'List permitted booking classes per sector',
-     'The booking codes section 5(b) sells this fare in, one sector at a time. This is what \c
-      to ask an inventory system for when searching for space the fare can actually use. \c
-      Runs no fare rules. `classes` holds the applicable codes; `alternates` holds codes the \c
-      notes allow only where something about the flight is true that an itinerary cannot show.',
-     Schema) :-
-    itinerary_schema(Schema).
-tool(routing, 'Write journey as a fare-construction routing',
-     'The same journey written in fare-construction notation, such as \c
+tool(itinerary, 'Validate, price or rewrite an itinerary',
+     'One itinerary, four questions. Pick one with `op`:\n\n\c
+      `validate` -- may this be sold as a oneworld Explorer fare? Returns a verdict of \c
+      valid, invalid or indeterminate, every rule broken with the clause it came from, and \c
+      the fare basis. Indeterminate means the input left out something a rule needed, not \c
+      that the rule passed. Takes `checks` and `annotations`.\n\n\c
+      `earn` -- what is the ticket worth? Points, miles and status currency per loyalty \c
+      programme and per sector, with the table row each figure came from. Runs no fare \c
+      rules: a journey that cannot be sold can still be priced, and a valid one can be \c
+      unpriceable. A sector whose booking class was not given is priced on the class section \c
+      5(b) sells this fare in, and the reply says which class it presumed and why; where no \c
+      5(b) row settles it, the sector comes back undecided rather than zero. Takes \c
+      `programs`.\n\n\c
+      `classes` -- which booking codes may it be sold in? The codes section 5(b) allows, one \c
+      sector at a time, which is what to ask an inventory system for when searching for \c
+      space the fare can actually use. Runs no fare rules. `classes` holds the applicable \c
+      codes; `alternates` holds codes the notes allow only where something about the flight \c
+      is true that an itinerary cannot show.\n\n\c
+      `routing` -- the same journey in fare-construction notation, such as \c
       "LHR-BA-JFK-AA-X/LAX-JL-NRT-CX-HKG-QR-X/DOH-QR-LHR". Runs no rules. Refuses when a \c
       point is neither a stopover nor a transfer, because the notation has no way to write \c
       "unknown" and a bare code already means stopover.',
      Schema) :-
-    itinerary_schema(Schema).
+    itinerary_schema(Base),
+    findall(P, earn_program_id(P), Ids),
+    Extra = _{ op: _{ type: string,
+                      enum: [validate, earn, classes, routing],
+                      description: 'Which question to answer. See the description; there is \c
+                                    no default, because the four answer different questions \c
+                                    about the same journey and guessing one would quietly \c
+                                    return something nobody asked for.' },
+               checks: _{ type: boolean,
+                          description: 'op=validate only. Also return one line per rule \c
+                                        measured, including the rules that passed and by how \c
+                                        much. Off by default.' },
+               annotations: _{ type: boolean,
+                               description: 'op=validate only. Also return the derived \c
+                                             geography of the journey: coordinates, continent \c
+                                             and traffic conference per sector, and the kind \c
+                                             of every connection. Off by default; a reader \c
+                                             wants the routing string, which is always \c
+                                             returned.' },
+               programs: _{ type: array,
+                            items: _{ type: string, enum: Ids },
+                            description: 'op=earn only. Which programmes to price. Every \c
+                                          registered programme by default. The reply carries \c
+                                          no ranking between them: comparing a mile with a \c
+                                          status point needs a valuation, and a valuation is \c
+                                          an opinion.' } },
+    add_properties(Base, Extra, Schema0),
+    % The only required key at the top level. Everything else about an itinerary
+    % is optional on purpose -- see itinerary_schema/1 -- but an absent `op` has
+    % no safe reading.
+    put_dict(required, Schema0, [op], Schema).
 tool(airports, 'Search airports by code, city or name',
      'Search the airport table by code, city or name, accent-folded. Use it to turn a place \c
       into the IATA code an itinerary needs, and to check a code is one the validator knows.',
@@ -442,6 +465,37 @@ add_properties(Schema, Extra, Out) :-
 
 tool_json(_{ name: Name, title: Title, description: Description, inputSchema: Schema }) :-
     tool(Name, Title, Description, Schema).
+
+%! tool_operation(+ToolName, +Args, -Op, -OpArgs) is det.
+%
+%  Which operation a tool call means, and the arguments to run it with.
+%
+%  For every tool but `itinerary` this is the identity: the tool is named after
+%  its operation. `itinerary` carries the operation in a required `op`
+%  parameter, which is read here and then REMOVED -- json_in.pl validates the
+%  argument dict strictly and would reject `op` as an unknown field, so leaving
+%  it in would turn every call into an input error.
+%
+%  A bad `op` is a caller mistake, so it comes back as an input error naming the
+%  four it could have been, rather than as a JSON-RPC error that reads to a
+%  model as a broken transport.
+tool_operation(itinerary, Args, Op, OpArgs) :-
+    !,
+    (   get_dict(op, Args, Op0)
+    ->  atom_string(Op, Op0)
+    ;   throw(mcp_error(-32602,
+                        'An itinerary call needs "op": one of validate, earn, \c
+                         classes or routing.'))
+    ),
+    (   memberchk(Op, [validate, earn, classes, routing])
+    ->  true
+    ;   format(atom(M),
+               'Unknown op: ~w. It is one of validate, earn, classes or routing.',
+               [Op]),
+        throw(mcp_error(-32602, M))
+    ),
+    del_dict(op, Args, _, OpArgs).
+tool_operation(Name, Args, Name, Args).
 
 % --- calling a tool --------------------------------------------------------
 

@@ -57,6 +57,13 @@ error_code(Method, Params, Code) :-
 call_tool(Name, Args, Result) :-
     result("tools/call", _{ name: Name, arguments: Args }, Result).
 
+% The four itinerary operations share one tool and are chosen with `op`, so a
+% client sends `itinerary` and never `validate`. This keeps the tests below
+% reading as "call validate with this" while sending what a client would.
+call_op(Op, Args, Result) :-
+    put_dict(op, Args, Op, Args1),
+    result("tools/call", _{ name: "itinerary", arguments: Args1 }, Result).
+
 % --- the protocol ----------------------------------------------------------
 
 :- begin_tests(mcp_protocol).
@@ -141,13 +148,67 @@ test(a_tool_result_is_not_cacheable) :-
 
 :- begin_tests(mcp_tools).
 
-% Every operation the other front ends answer is reachable here, under the same
-% name. One vocabulary across the CLI subcommands, the HTTP paths, the browser
-% ops and these.
-test(every_operation_is_a_tool_of_the_same_name) :-
+% Every operation the other front ends answer is reachable here. Three are
+% tools named after the operation; the four that share itinerary_schema/1 are
+% one tool and are chosen with `op`, so the invariant is reachability rather
+% than a name-for-name match.
+%
+% It still catches the thing that matters, which is why it is not weakened to a
+% subset check: an operation added to ops.pl and never exposed, or an `op` enum
+% value that names no operation and so can only fail at call time.
+exposed_op(Op) :-
+    tool(Op, _, _, _),
+    Op \== itinerary.
+exposed_op(Op) :-
+    tool(itinerary, _, _, Schema),
+    get_dict(properties, Schema, Props),
+    get_dict(op, Props, OpSpec),
+    get_dict(enum, OpSpec, Enum),
+    member(Op, Enum).
+
+test(every_operation_is_reachable_as_a_tool) :-
     findall(Op, known_op(Op), Ops),
-    findall(Name, tool(Name, _, _, _), Names),
+    findall(Name, exposed_op(Name), Names),
     msort(Ops, Sorted), msort(Names, Sorted).
+
+% The saving this collapse was made for, asserted so it cannot quietly come
+% back: one schema carrying `segments` rather than four. Four copies of it was
+% 7.2 KB, over a tenth of what the gateway sends every conversation.
+test(only_one_tool_carries_the_itinerary_schema) :-
+    findall(Name,
+            ( tool(Name, _, _, Schema),
+              get_dict(properties, Schema, Props),
+              get_dict(segments, Props, _) ),
+            Names),
+    assertion(Names == [itinerary]).
+
+% `op` is required, and absent or unknown is a caller mistake named as such
+% rather than a crash or a silently-chosen default.
+test(an_itinerary_call_without_an_op_is_refused) :-
+    fixture(lhr_classic, Dict),
+    error_code("tools/call", _{ name: "itinerary", arguments: Dict }, Code),
+    assertion(Code == -32602).
+
+test(an_unknown_op_is_refused) :-
+    fixture(lhr_classic, Dict),
+    put_dict(op, Dict, "frobnicate", Bad),
+    error_code("tools/call", _{ name: "itinerary", arguments: Bad }, Code),
+    assertion(Code == -32602).
+
+% The four names a client used to call directly are gone, and that is the
+% breaking half of this change. Asserted so it is a decision in the record
+% rather than something noticed from a client error.
+test(the_four_operations_are_no_longer_tools_of_their_own) :-
+    forall(member(Op, [validate, earn, classes, routing]),
+           assertion(\+ tool(Op, _, _, _))).
+
+% `op` is stripped before the arguments reach json_in.pl, which validates them
+% strictly. Leaving it in would turn every single call into an input error, and
+% the symptom would look like a bad itinerary rather than a bad dispatch.
+test(the_op_key_does_not_reach_the_itinerary_reader) :-
+    fixture(lhr_classic, Dict),
+    call_op("routing", Dict, R),
+    assertion(R.isError == false).
 
 test(every_tool_declares_a_usable_schema) :-
     forall(tool(Name, Title, Description, Schema),
@@ -179,29 +240,32 @@ test(an_unknown_tool_is_a_protocol_error) :-
 % model can read the first and try again; the second reads to it as a broken
 % transport.
 test(malformed_input_is_a_tool_error_not_a_protocol_error) :-
-    call_tool("validate", _{ route: "LHR-BA" }, R),
+    call_op("validate", _{ route: "LHR-BA" }, R),
     assertion(R.isError == true),
     R.content = [C|_],
     assertion(C.type == text),
     assertion(C.text \== '').
 
 test(giving_both_forms_is_refused) :-
-    call_tool("validate",
+    call_op("validate",
               _{ route: "LHR-BA-JFK-BA-LHR",
                  segments: [_{ from: "LHR", to: "JFK" }] },
               R),
     assertion(R.isError == true).
 
-test(every_tool_answers_over_a_fixture) :-
+test(every_operation_answers_over_a_fixture) :-
     fixture(lhr_classic, Dict),
-    forall(member(Name-Args,
-                  [ "validate"-Dict, "earn"-Dict, "classes"-Dict, "routing"-Dict,
-                    "airports"-_{ q: "sydney" },
-                    "ruleset"-_{}, "programs"-_{} ]),
-           ( call_tool(Name, Args, R),
+    forall(member(Op, ["validate", "earn", "classes", "routing"]),
+           ( call_op(Op, Dict, R),
              assertion(R.isError == false),
              assertion(R.content = [_|_]),
-             assertion(get_dict(structuredContent, R, _)) )).
+             assertion(get_dict(structuredContent, R, _)) )),
+    forall(member(Name-Args,
+                  [ "airports"-_{ q: "sydney" }, "ruleset"-_{}, "programs"-_{} ]),
+           ( call_tool(Name, Args, R2),
+             assertion(R2.isError == false),
+             assertion(R2.content = [_|_]),
+             assertion(get_dict(structuredContent, R2, _)) )).
 
 % The register is four times the length of the verdict it supports, and the
 % annotations are coordinates a reader cannot use. Both are off unless asked
@@ -209,7 +273,7 @@ test(every_tool_answers_over_a_fixture) :-
 % it is promoted rather than withheld.
 test(a_verdict_carries_neither_the_register_nor_the_map_unless_asked) :-
     fixture(lhr_classic, Dict),
-    call_tool("validate", Dict, R),
+    call_op("validate", Dict, R),
     S = R.structuredContent,
     assertion(\+ get_dict(checks, S, _)),
     assertion(\+ get_dict(annotations, S, _)),
@@ -219,19 +283,19 @@ test(a_verdict_carries_neither_the_register_nor_the_map_unless_asked) :-
 
 test(the_register_comes_back_when_it_is_asked_for) :-
     fixture(lhr_classic, Dict),
-    call_tool("validate", Dict.put(checks, true), R),
+    call_op("validate", Dict.put(checks, true), R),
     assertion(get_dict(checks, R.structuredContent, [_|_])).
 
 test(the_map_comes_back_when_it_is_asked_for) :-
     fixture(lhr_classic, Dict),
-    call_tool("validate", Dict.put(annotations, true), R),
+    call_op("validate", Dict.put(annotations, true), R),
     assertion(get_dict(annotations, R.structuredContent, _)).
 
 % The text is the point of the split: it is what a reader reads, and it is two
 % orders of magnitude smaller than the report behind it.
 test(the_text_is_shorter_than_the_report) :-
     fixture(lhr_classic, Dict),
-    call_tool("validate", Dict, R),
+    call_op("validate", Dict, R),
     R.content = [C|_],
     atom_json_dict(Json, R.structuredContent, [as(atom), width(0)]),
     atom_length(C.text, TextLength),
@@ -290,11 +354,10 @@ test(the_tariff_transcription_is_the_tariff_transcription) :-
 test(a_non_ascii_literal_is_not_mangled_at_load_time) :-
     atom_codes('→', Codes),
     assertion(Codes == [0x2192]),
-    result("tools/call",
-           _{ name: "validate",
-              arguments: _{ route: "NYC-BA-X/LON-QR-SIN-QF-SYD-QF-X/LAX-AA-NYC",
-                            cabin: "business", checks: true } },
-           R),
+    call_op("validate",
+            _{ route: "NYC-BA-X/LON-QR-SIN-QF-SYD-QF-X/LAX-AA-NYC",
+               cabin: "business", checks: true },
+            R),
     R.content = [C|_],
     assertion(sub_string(C.text, _, _, _, "TC1 → TC2")),
     assertion(\+ sub_string(C.text, _, _, _, "�")).
